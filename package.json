@@ -1,52 +1,25 @@
 {
-  "name": "silicon-eight",
-  "version": "0.0.0",
-  "scripts": {
-    "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
-    "test": "ng test",
-    "lint": "ng lint",
-    "e2e": "ng e2e"
-  },
+  "name": "chip8-react",
+  "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
   "dependencies": {
-    "@angular/animations": "~9.1.0",
-    "@angular/cli": "^9.0.7",
-    "@angular/common": "~9.1.0",
-    "@angular/compiler": "~9.1.0",
-    "@angular/core": "~9.1.0",
-    "@angular/forms": "~9.1.0",
-    "@angular/platform-browser": "~9.1.0",
-    "@angular/platform-browser-dynamic": "~9.1.0",
-    "@angular/router": "~9.1.0",
-    "angular-cli-ghpages": "^0.6.2",
-    "core-js": "^3.6.4",
-    "minimist": "^1.2.5",
-    "npm-check-updates": "^4.0.6",
-    "rxjs": "^6.5.4",
-    "serialize-javascript": "^2.1.2",
-    "tslib": "^1.10.0",
-    "zone.js": "~0.10.2"
+    "next": "14.2.5",
+    "prettier": "^3.3.2",
+    "react": "^18",
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "~0.900.7",
-    "@angular/compiler-cli": "~9.1.0",
-    "@angular/language-service": "~9.1.0",
-    "@types/jasmine": "^3.5.10",
-    "@types/jasminewd2": "~2.0.8",
-    "@types/node": "^12.11.1",
-    "codelyzer": "^5.1.2",
-    "jasmine-core": "~3.5.0",
-    "jasmine-spec-reporter": "~4.2.1",
-    "karma": "~4.4.1",
-    "karma-chrome-launcher": "~3.1.0",
-    "karma-coverage-istanbul-reporter": "~2.1.1",
-    "karma-jasmine": "~2.0.1",
-    "karma-jasmine-html-reporter": "^1.5.3",
-    "protractor": "^5.4.3",
-    "ts-node": "~8.5.4",
-    "tslint": "~5.20.1",
-    "typescript": "^3.8.3"
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "typescript": "^5"
   }
 }
