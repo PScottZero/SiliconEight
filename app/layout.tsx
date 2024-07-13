@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = IBM_Plex_Mono({
+  weight: "400",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  title: "Chip8",
-  description: "Chip8 Emulator",
+  title: "CHIP-8 Interpreter",
+  description: "CHIP-8 interpreter written using next.js",
 };
 
 export default function RootLayout({

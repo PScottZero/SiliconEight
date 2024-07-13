@@ -1,6 +1,5 @@
-import Image from "next/image";
 import styles from "./page.module.css";
-import Chip8 from "./components/chip8/chip8";
+import Chip8 from "./chip8";
 
 export default function Home() {
   return (
