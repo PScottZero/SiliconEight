@@ -15,6 +15,7 @@ const Y_MASK = 0x00f0;
 const X_SHIFT = 8;
 const Y_SHIFT = 4;
 const MSB_SHIFT = 7;
+const BYTE_SHIFT = 8;
 
 const CHAR_ROWS = 5;
 const CHARS = [
@@ -37,28 +38,30 @@ const CHARS = [
 ];
 
 export class Chip8State {
-  private _mem: Array<number>; // 4096 bytes of memory
+  private _mem: Uint8Array; // 4096 bytes of memory
   private _stack: Array<number>; // 12-bit address stack
-  private _v: Array<number>; // 16 8-bit registers
+  private _v: Uint8Array; // 16 8-bit registers
   private _pc: number; // 12-bit program counter
   private _i: number; // 12-bit memory pointer
-  private _delay: number; // 8-bit delay timer
-  private _sound: number; // 8-bit sound timer
   display: Array<Array<number>>; // 64x32 monochrome display
+  delay: number; // 8-bit delay timer
+  sound: number; // 8-bit sound timer
   keys: Array<boolean>; // 16 keyboard keys
+  private _keyReg: number; // used for wait for key press opcode
 
   constructor() {
-    this._mem = Array<number>(MEM_SIZE).fill(0);
+    this._mem = new Uint8Array(MEM_SIZE).fill(0);
     this._stack = Array<number>();
-    this._v = Array<number>(REG_COUNT).fill(0);
+    this._v = new Uint8Array(REG_COUNT).fill(0);
     this._pc = START_ADDR;
     this._i = 0;
-    this._delay = 0;
-    this._sound = 0;
+    this.delay = 0;
+    this.sound = 0;
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0),
+      Array<number>(DISP_WIDTH).fill(0)
     );
     this.keys = Array<boolean>(KEY_COUNT).fill(false);
+    this._keyReg = -1;
 
     // copy character data
     for (let i = 0; i < CHARS.length; i++) {
@@ -70,12 +73,16 @@ export class Chip8State {
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  // Machine Cycle
+  // Run Machine Cycle
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   step() {
-    const opcode = (this.read(this._pc++) << 8) | this.read(this._pc++);
+    if (!this.keyPressCheck()) return;
+
+    const hi = this._mem[this._pc++];
+    const lo = this._mem[this._pc++];
+    const opcode = (hi << BYTE_SHIFT) | lo;
 
     const op = (opcode & OP_MASK) >>> OP_SHIFT;
     const nnn = opcode & NNN_MASK;
@@ -254,19 +261,19 @@ export class Chip8State {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   skipIfRegXEqualsNN(x: number, nn: number) {
-    this.skipIfCond(this._v[x] == nn);
+    this.skipIfCond(this._v[x] === nn);
   }
 
   skipIfRegXNotEqualsNN(x: number, nn: number) {
-    this.skipIfCond(this._v[x] != nn);
+    this.skipIfCond(this._v[x] !== nn);
   }
 
   skipIfRegXEqualsRegY(x: number, y: number) {
-    this.skipIfCond(this._v[x] == this._v[y]);
+    this.skipIfCond(this._v[x] === this._v[y]);
   }
 
   skipIfRegXNotEqualsRegY(x: number, y: number) {
-    this.skipIfCond(this._v[x] != this._v[y]);
+    this.skipIfCond(this._v[x] !== this._v[y]);
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -282,9 +289,8 @@ export class Chip8State {
   }
 
   waitForKeyPress(x: number) {
-    let key = 0;
-    while ((key = this.pressedKey()) >= 0) {}
-    this._v[x] = key;
+    console.log("Waiting for key press...");
+    this._keyReg = x;
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -351,15 +357,15 @@ export class Chip8State {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   setRegXToDelay(x: number) {
-    this._v[x] = this._delay;
+    this._v[x] = this.delay;
   }
 
   setDelayToRegX(x: number) {
-    this._delay = this._v[x];
+    this.delay = this._v[x];
   }
 
   setSoundToRegX(x: number) {
-    this._sound = this._v[x];
+    this.sound = this._v[x];
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -417,7 +423,7 @@ export class Chip8State {
 
   clearDisplay() {
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0),
+      Array<number>(DISP_WIDTH).fill(0)
     );
   }
 
@@ -426,10 +432,10 @@ export class Chip8State {
     const yCoord = this._v[y];
     for (let row = 0; row < n; row++) {
       let rowByte = this._mem[this._i + row];
-      const pxY = yCoord + row;
+      const pxY = (yCoord + row) % DISP_HEIGHT;
       for (let col = 0; col < 8; col++) {
         const px = (rowByte >>> (7 - col)) & 1;
-        const pxX = xCoord + col;
+        const pxX = (xCoord + col) % DISP_WIDTH;
         const oldPx = this.display[pxY][pxX];
         this.display[pxY][pxX] ^= px;
         if (oldPx == 1 && this.display[pxY][pxX] == 0) {
@@ -440,40 +446,41 @@ export class Chip8State {
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  // Invalid Instruction
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-  invalidOpcode(opcode: number) {
-    console.log("invalid opcode: %04x", opcode);
-  }
-
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  // Memory
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-  read(addr: number): number {
-    return this._mem[addr];
-  }
-
-  write(addr: number, value: number) {
-    this._mem[addr] = value & NN_MASK;
-  }
-
-  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // Helpers
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-  skipIfCond(cond: boolean) {
-    if (cond) {
-      this._pc++;
+  async loadProgram(path: string) {
+    const res = await fetch(encodeURI(path));
+    if (res.ok) {
+      const blob = await res.blob();
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      for (let byte = 0; byte < bytes.length; byte++) {
+        this._mem[START_ADDR + byte] = bytes[byte];
+      }
     }
   }
 
-  pressedKey(): number {
+  skipIfCond(cond: boolean) {
+    if (cond) {
+      this._pc += 2;
+    }
+  }
+
+  keyPressCheck(): boolean {
+    if (this._keyReg < 0) return true;
+
+    const key = this.getFirstPressedKey();
+    if (key < 0) return false;
+
+    console.log("Accepted key press:", key);
+    this._v[this._keyReg] = key;
+    this._keyReg = -1;
+    return true;
+  }
+
+  getFirstPressedKey(): number {
     for (let key = 0; key < KEY_COUNT; key++) {
       if (this.keys[key]) {
         return key;
@@ -482,14 +489,16 @@ export class Chip8State {
     return -1;
   }
 
-  async runIBMLogo() {
-    const res = await fetch(encodeURI("bin/IBM Logo.ch8"));
-    if (res.ok) {
-      const blob = await res.blob();
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      for (let byte = 0; byte < bytes.length; byte++) {
-        this._mem[START_ADDR + byte] = bytes[byte];
-      }
+  decrementTimers() {
+    if (this.delay > 0) {
+      this.delay -= 1;
     }
+    if (this.sound > 0) {
+      this.sound -= 1;
+    }
+  }
+
+  invalidOpcode(opcode: number) {
+    console.log("Invalid opcode:", opcode);
   }
 }
