@@ -1,7 +1,3 @@
-import { RefObject } from "react";
-import { Display } from "./display";
-import { Keypad } from "./keypad";
-
 const MEM_SIZE = 0x1000;
 const START_ADDR = 0x200;
 const REG_COUNT = 16;
@@ -18,7 +14,15 @@ const Y_SHIFT = 4;
 const MSB_SHIFT = 7;
 const BYTE_SHIFT = 8;
 
-const OPS_PER_FRAME = 10;
+export const DISP_WIDTH = 64;
+export const DISP_HEIGHT = 32;
+export const DISP_SCALE = 100;
+const PX_ON_COLOR = "#00ffff";
+const PX_OFF_COLOR = "#000000";
+
+const OPS_PER_MS = 0.5; // 500 Hz
+const FRAMES_PER_SEC = 60;
+const MS_PER_FRAME = 1000 / FRAMES_PER_SEC;
 
 const CHAR_ROWS = 5;
 const CHARS = [
@@ -40,18 +44,41 @@ const CHARS = [
   [0xf0, 0x80, 0xf0, 0x80, 0x80], // F
 ];
 
+const KEY_MAP = new Map<string, number>([
+  ["1", 0x1],
+  ["2", 0x2],
+  ["3", 0x3],
+  ["4", 0xc],
+  ["q", 0x4],
+  ["w", 0x5],
+  ["e", 0x6],
+  ["r", 0xd],
+  ["a", 0x7],
+  ["s", 0x8],
+  ["d", 0x9],
+  ["f", 0xe],
+  ["z", 0xa],
+  ["x", 0x0],
+  ["c", 0xb],
+  ["v", 0xf],
+]);
+
 export class Chip8Interpreter {
+  ctx: CanvasRenderingContext2D;
   mem: Uint8Array; // 4096 bytes of memory
   stack: Array<number>; // 12-bit address stack
   v: Uint8Array; // 16 8-bit registers
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
-  display: Display; // 64x32 monochrome display
-  keypad: Keypad; // 16-key keypad
+  display: Array<Array<number>>; // 64x32 monochrome display
+  keys: Array<boolean>; // 16 keypad keys
+  keyReg: number; // used for wait for key press opcode
   delay: number; // 8-bit delay timer
   sound: number; // 8-bit sound timer
+  running: boolean; // start + stop interpreter
 
-  constructor(canvasRef: RefObject<HTMLCanvasElement>) {
+  constructor(ctx: CanvasRenderingContext2D) {
+    this.ctx = ctx;
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
     this.v = new Uint8Array(REG_COUNT).fill(0);
@@ -59,8 +86,41 @@ export class Chip8Interpreter {
     this.i = 0;
     this.delay = 0;
     this.sound = 0;
-    this.display = new Display(this, canvasRef);
-    this.keypad = new Keypad(this);
+    this.display = Array.from({ length: DISP_HEIGHT }, () =>
+      Array<number>(DISP_WIDTH).fill(0),
+    );
+    this.keys = Array<boolean>(KEY_MAP.size).fill(false);
+    this.keyReg = -1;
+    this.running = true;
+    this.copyCharData();
+  }
+
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  // Interpreter
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+  async run(program: string) {
+    await this.loadProgram(program);
+    const startTime = Date.now();
+    requestAnimationFrame(() => this.frameLoop(startTime, startTime));
+  }
+
+  reset() {
+    this.mem = new Uint8Array(MEM_SIZE).fill(0);
+    this.stack = Array<number>();
+    this.v = new Uint8Array(REG_COUNT).fill(0);
+    this.pc = START_ADDR;
+    this.i = 0;
+    this.delay = 0;
+    this.sound = 0;
+    this.clearDisplay();
+    this.keys = Array<boolean>(KEY_MAP.size).fill(false);
+    this.keyReg = -1;
+    this.running = true;
+    this.copyCharData();
+  }
+
+  copyCharData() {
     for (let i = 0; i < CHARS.length; i++) {
       for (let row = 0; row < CHAR_ROWS; row++) {
         this.mem[i * CHAR_ROWS + row] = CHARS[i][row];
@@ -68,21 +128,27 @@ export class Chip8Interpreter {
     }
   }
 
-  async run(program: string) {
-    console.log("Running program:", program);
-    await this.loadProgram(program);
-    requestAnimationFrame(() => this.frameLoop());
+  frameLoop(timeStamp: number, frameStamp: number) {
+    if (!this.running) return;
+
+    const now = Date.now();
+
+    const diff = now - timeStamp;
+    const frameOps = diff * OPS_PER_MS;
+    for (let i = 0; i < frameOps; i++) this.step();
+
+    const frameDiff = now - frameStamp;
+    if (frameDiff >= MS_PER_FRAME) {
+      frameStamp = now - (frameDiff - MS_PER_FRAME);
+      this.decrementTimers();
+      this.renderFrame();
+    }
+
+    requestAnimationFrame(() => this.frameLoop(now, frameStamp));
   }
 
-  frameLoop() {
-    for (let i = 0; i < OPS_PER_FRAME; i++) this.step();
-    this.decrementTimers();
-    this.display.renderFrame();
-    requestAnimationFrame(() => this.frameLoop());
-  }
-
-  async loadProgram(path: string) {
-    const res = await fetch(encodeURI(path));
+  async loadProgram(program: string) {
+    const res = await fetch("bin/" + encodeURI(program));
     if (res.ok) {
       const blob = await res.blob();
       const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -93,7 +159,7 @@ export class Chip8Interpreter {
   }
 
   step() {
-    if (this.keypad.skipIfWaitingForKeyPress()) return;
+    if (this.skipIfWaitingForKeyPress()) return;
 
     const hi = this.mem[this.pc++];
     const lo = this.mem[this.pc++];
@@ -110,7 +176,7 @@ export class Chip8Interpreter {
       case 0x0:
         switch (nnn) {
           case 0x0e0:
-            this.display.clear();
+            this.clearDisplay();
             break;
           case 0x0ee:
             this.pc = this.stack.pop() ?? START_ADDR;
@@ -128,13 +194,13 @@ export class Chip8Interpreter {
         this.pc = nnn;
         break;
       case 0x3:
-        this.skipIfCond(this.v[x] === nn);
+        if (this.v[x] === nn) this.pc += 2;
         break;
       case 0x4:
-        this.skipIfCond(this.v[x] !== nn);
+        if (this.v[x] !== nn) this.pc += 2;
         break;
       case 0x5:
-        this.skipIfCond(this.v[x] === this.v[y]);
+        if (this.v[x] === this.v[y]) this.pc += 2;
         break;
       case 0x6:
         this.v[x] = nn;
@@ -176,27 +242,28 @@ export class Chip8Interpreter {
         }
         break;
       case 0x9:
-        this.skipIfCond(this.v[x] !== this.v[y]);
+        if (this.v[x] !== this.v[y]) this.pc += 2;
         break;
       case 0xa:
         this.i = nnn;
         break;
       case 0xb:
+        // TODO
         this.pc = (this.v[0] + nnn) & NNN_MASK;
         break;
       case 0xc:
         this.v[x] = Math.floor(Math.random() * 256) & nn;
         break;
       case 0xd:
-        this.display.drawSprite(x, y, n);
+        this.drawSprite(x, y, n);
         break;
       case 0xe:
         switch (nn) {
           case 0x9e:
-            this.skipIfCond(this.keypad.keys[this.v[x]]);
+            if (this.keys[this.v[x]]) this.pc += 2;
             break;
           case 0xa1:
-            this.skipIfCond(!this.keypad.keys[this.v[x]]);
+            if (!this.keys[this.v[x]]) this.pc += 2;
             break;
           default:
             this.invalidOpcode(opcode);
@@ -209,7 +276,7 @@ export class Chip8Interpreter {
             this.v[x] = this.delay;
             break;
           case 0x0a:
-            this.keypad.keyReg = x;
+            this.keyReg = x;
             break;
           case 0x15:
             this.delay = this.v[x];
@@ -252,7 +319,7 @@ export class Chip8Interpreter {
     const regAVal = this.v[regA];
     if (sub) this.v[regB] = ~this.v[regB] + 1;
     this.v[x] = this.v[regA] + this.v[regB];
-    this.v[0xf] = this.v[x] < regAVal || (sub && this.v[regB] == 0) ? 1 : 0;
+    this.v[0xf] = this.v[x] < regAVal || (sub && this.v[regB] === 0) ? 1 : 0;
   }
 
   bcd(x: number) {
@@ -264,22 +331,91 @@ export class Chip8Interpreter {
     this.mem[this.i + 2] = Math.floor(value);
   }
 
-  skipIfCond(cond: boolean) {
-    if (cond) {
-      this.pc += 2;
-    }
-  }
-
   decrementTimers() {
-    if (this.delay > 0) {
-      this.delay -= 1;
-    }
-    if (this.sound > 0) {
-      this.sound -= 1;
-    }
+    if (this.delay > 0) this.delay -= 1;
+    if (this.sound > 0) this.sound -= 1;
   }
 
   invalidOpcode(opcode: number) {
     console.log("Invalid opcode:", opcode);
+    this.running = false;
+  }
+
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  // Display
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+  async renderFrame() {
+    for (let row = 0; row < DISP_HEIGHT; row++) {
+      for (let col = 0; col < DISP_WIDTH; col++) {
+        this.ctx.fillStyle = this.display[row][col]
+          ? PX_ON_COLOR
+          : PX_OFF_COLOR;
+        this.ctx.fillRect(
+          col * DISP_SCALE,
+          row * DISP_SCALE,
+          DISP_SCALE,
+          DISP_SCALE,
+        );
+      }
+    }
+  }
+
+  drawSprite(x: number, y: number, n: number) {
+    this.v[0xf] = 0;
+    const xCoord = this.v[x];
+    const yCoord = this.v[y];
+    for (let row = 0; row < n; row++) {
+      let rowByte = this.mem[this.i + row];
+      const pxY = (yCoord + row) % DISP_HEIGHT;
+      for (let col = 0; col < 8; col++) {
+        const px = (rowByte >>> (7 - col)) & 1;
+        const pxX = (xCoord + col) % DISP_WIDTH;
+        const oldPx = this.display[pxY][pxX];
+        this.display[pxY][pxX] ^= px;
+        if (oldPx === 1 && px === 1) this.v[0xf] = 1;
+      }
+    }
+  }
+
+  clearDisplay() {
+    this.display = Array.from({ length: DISP_HEIGHT }, () =>
+      Array<number>(DISP_WIDTH).fill(0),
+    );
+  }
+
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+  // Keypad
+  // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+  keyDownHandler(ev: KeyboardEvent) {
+    const key = KEY_MAP.get(ev.key);
+    if (key !== undefined) this.keys[key] = true;
+  }
+
+  keyUpHandler(ev: KeyboardEvent) {
+    const key = KEY_MAP.get(ev.key);
+    if (key !== undefined) this.keys[key] = false;
+  }
+
+  skipIfWaitingForKeyPress(): boolean {
+    if (this.keyReg < 0) return false;
+
+    const key = this.getFirstPressedKey();
+    if (key < 0) return true;
+
+    console.log("Accepted key press:", key);
+    this.v[this.keyReg] = key;
+    this.keyReg = -1;
+    return false;
+  }
+
+  getFirstPressedKey(): number {
+    for (let key = 0; key < KEY_MAP.size; key++) {
+      if (this.keys[key]) {
+        return key;
+      }
+    }
+    return -1;
   }
 }

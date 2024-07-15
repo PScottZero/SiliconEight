@@ -1,13 +1,25 @@
 .chip8 {
+  --base-size: 0.9;
+
+  --title-row: min(4rem * var(--base-size), 4vw * var(--base-size));
+  --disp-row: min(32rem * var(--base-size), 32vw * var(--base-size));
+  --desc-row: min(16rem * var(--base-size), 16vw * var(--base-size));
+
+  --progs-col: min(16rem * var(--base-size), 16vw * var(--base-size));
+  --disp-col: min(64rem * var(--base-size), 64vw * var(--base-size));
+
+  --font-size: min(1.5rem * var(--base-size), 1.5vw * var(--base-size));
+  --gap-size: min(0.5rem * var(--base-size), 0.5vw * var(--base-size));
+
   display: grid;
   grid-template-areas:
     "titleBar    titleBar   "
     "programList display    "
     "description description";
-  grid-template-columns: min(16vw, 16rem) min(64vw, 64rem);
-  grid-template-rows: min(4vw, 4rem) min(32vw, 32rem) min(16vw, 16rem);
-  gap: min(0.5vw, 0.5rem);
-  padding: min(0.5vw, 0.5rem);
+  grid-template-rows: var(--title-row) var(--disp-row) var(--desc-row);
+  grid-template-columns: var(--progs-col) var(--disp-col);
+  gap: var(--gap-size);
+  padding: var(--gap-size);
   background: #00ffff;
 }
 
@@ -18,16 +30,16 @@
   align-items: center;
   background: black;
   font-weight: bold;
-  font-size: min(1.5vw, 1.5rem);
+  font-size: var(--font-size);
 }
 
 .programList {
   grid-area: programList;
-  overflow-y: auto;
-  font-size: min(1.5vw, 1.5rem);
+  font-size: var(--font-size);
+  padding: var(--gap-size);
   background: black;
-  padding: min(1vw, 1rem);
   font-weight: bold;
+  overflow-y: auto;
 }
 
 .programList > div:hover {
@@ -47,8 +59,8 @@
 .description {
   grid-area: description;
   background: black;
-  padding: min(1vw, 1rem);
+  padding: var(--gap-size);
   font-weight: bold;
-  font-size: min(1.5vw, 1.5rem);
+  font-size: var(--font-size);
   overflow-y: auto;
 }
