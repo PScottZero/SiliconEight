@@ -16,7 +16,7 @@ const BYTE_SHIFT = 8;
 
 export const DISP_WIDTH = 64;
 export const DISP_HEIGHT = 32;
-export const DISP_SCALE = 100;
+export const DISP_SCALE = 64;
 const PX_ON_COLOR = "#00ff7f";
 const PX_OFF_COLOR = "#000000";
 
