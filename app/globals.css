@@ -1,3 +1,7 @@
+:root {
+  --primary-color: #00ff7f;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -8,11 +12,8 @@ html,
 body {
   width: 100vw;
   height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   background: black;
-  color: #00ffff;
+  color: var(--primary-color);
 }
 
 a {

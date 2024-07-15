@@ -63,7 +63,7 @@ const PROGRAMS = new Map<string, string>([
   ["Pong (alt)", "Pong (alt).ch8"],
   ["Pong 2 (Pong hack)", "Pong 2 (Pong hack) [David Winter, 1997].ch8"],
   ["Pong", "Pong [Paul Vervalin, 1990].ch8"],
-  ["Programmable Spacefighters", "Programmable Spacefighters [Jef Winsor].ch8"],
+  ["Prog. Spacefighters", "Programmable Spacefighters [Jef Winsor].ch8"],
   ["Puzzle", "Puzzle.ch8"],
   ["Random Number Test", "Random Number Test [Matthew Mikolay, 2010].ch8"],
   ["Reversi", "Reversi [Philip Baltzer].ch8"],
