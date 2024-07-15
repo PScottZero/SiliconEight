@@ -1,15 +1,13 @@
 .chip8 {
-  --base-size: 0.9;
+  --title-row: min(4rem, 4vw);
+  --disp-row: min(32rem, 32vw);
+  --desc-row: min(16rem, 16vw);
 
-  --title-row: min(4rem * var(--base-size), 4vw * var(--base-size));
-  --disp-row: min(32rem * var(--base-size), 32vw * var(--base-size));
-  --desc-row: min(16rem * var(--base-size), 16vw * var(--base-size));
+  --progs-col: min(20rem, 20vw);
+  --disp-col: min(64rem, 64vw);
 
-  --progs-col: min(16rem * var(--base-size), 16vw * var(--base-size));
-  --disp-col: min(64rem * var(--base-size), 64vw * var(--base-size));
-
-  --font-size: min(1.5rem * var(--base-size), 1.5vw * var(--base-size));
-  --gap-size: min(0.5rem * var(--base-size), 0.5vw * var(--base-size));
+  --font-size: min(1.5rem, 1.5vw);
+  --gap-size: min(0.5rem, 0.5vw);
 
   display: grid;
   grid-template-areas:

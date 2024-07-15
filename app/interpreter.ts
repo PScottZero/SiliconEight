@@ -20,9 +20,11 @@ export const DISP_SCALE = 100;
 const PX_ON_COLOR = "#00ffff";
 const PX_OFF_COLOR = "#000000";
 
-const OPS_PER_MS = 0.5; // 500 Hz
+const MS_PER_SEC = 1000;
+const OPS_PER_SEC = 500;
+const OPS_PER_MS = OPS_PER_SEC / MS_PER_SEC;
 const FRAMES_PER_SEC = 60;
-const MS_PER_FRAME = 1000 / FRAMES_PER_SEC;
+const MS_PER_FRAME = MS_PER_SEC / FRAMES_PER_SEC;
 
 const CHAR_ROWS = 5;
 const CHARS = [
@@ -84,13 +86,13 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
-    this.delay = 0;
-    this.sound = 0;
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
       Array<number>(DISP_WIDTH).fill(0),
     );
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
+    this.delay = 0;
+    this.sound = 0;
     this.running = true;
     this.copyCharData();
   }
@@ -102,7 +104,7 @@ export class Chip8Interpreter {
   async run(program: string) {
     await this.loadProgram(program);
     const startTime = Date.now();
-    requestAnimationFrame(() => this.frameLoop(startTime, startTime));
+    requestAnimationFrame(() => this.runLoop(startTime, startTime));
   }
 
   reset() {
@@ -111,11 +113,13 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
-    this.delay = 0;
-    this.sound = 0;
-    this.clearDisplay();
+    this.display = Array.from({ length: DISP_HEIGHT }, () =>
+      Array<number>(DISP_WIDTH).fill(0),
+    );
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
+    this.delay = 0;
+    this.sound = 0;
     this.running = true;
     this.copyCharData();
   }
@@ -128,7 +132,7 @@ export class Chip8Interpreter {
     }
   }
 
-  frameLoop(timeStamp: number, frameStamp: number) {
+  runLoop(timeStamp: number, frameStamp: number) {
     if (!this.running) return;
 
     const now = Date.now();
@@ -144,7 +148,7 @@ export class Chip8Interpreter {
       this.renderFrame();
     }
 
-    requestAnimationFrame(() => this.frameLoop(now, frameStamp));
+    requestAnimationFrame(() => this.runLoop(now, frameStamp));
   }
 
   async loadProgram(program: string) {
@@ -223,17 +227,20 @@ export class Chip8Interpreter {
             this.v[x] ^= this.v[y];
             break;
           case 0x4:
-            this.add(x, x, y);
+            this.v[0xf] = this.v[x] + this.v[y] > 0xff ? 1 : 0;
+            this.v[x] += this.v[y];
             break;
           case 0x5:
-            this.add(x, x, y, true);
+            this.v[0xf] = this.v[x] < this.v[y] ? 0 : 1;
+            this.v[x] -= this.v[y];
             break;
           case 0x6:
             this.v[0xf] = this.v[x] & 1;
             this.v[x] >>>= 1;
             break;
           case 0x7:
-            this.add(x, y, x, true);
+            this.v[0xf] = this.v[y] < this.v[x] ? 0 : 1;
+            this.v[x] = this.v[y] - this.v[x];
             break;
           case 0xe:
             this.v[0xf] = (this.v[x] >>> MSB_SHIFT) & 1;
@@ -248,7 +255,6 @@ export class Chip8Interpreter {
         this.i = nnn;
         break;
       case 0xb:
-        // TODO
         this.pc = (this.v[0] + nnn) & NNN_MASK;
         break;
       case 0xc:
@@ -276,6 +282,7 @@ export class Chip8Interpreter {
             this.v[x] = this.delay;
             break;
           case 0x0a:
+            console.log("Waiting for keypress...");
             this.keyReg = x;
             break;
           case 0x15:
@@ -313,13 +320,6 @@ export class Chip8Interpreter {
         this.invalidOpcode(opcode);
         break;
     }
-  }
-
-  add(x: number, regA: number, regB: number, sub: boolean = false) {
-    const regAVal = this.v[regA];
-    if (sub) this.v[regB] = ~this.v[regB] + 1;
-    this.v[x] = this.v[regA] + this.v[regB];
-    this.v[0xf] = this.v[x] < regAVal || (sub && this.v[regB] === 0) ? 1 : 0;
   }
 
   bcd(x: number) {
@@ -406,6 +406,7 @@ export class Chip8Interpreter {
 
     console.log("Accepted key press:", key);
     this.v[this.keyReg] = key;
+    this.keys[key] = false;
     this.keyReg = -1;
     return false;
   }
