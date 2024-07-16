@@ -17,7 +17,7 @@ const BYTE_SHIFT = 8;
 export const DISP_WIDTH = 64;
 export const DISP_HEIGHT = 32;
 export const DISP_SCALE = 64;
-const PX_ON_COLOR = "#00ff7f";
+const PX_ON_COLOR = "#00ffff";
 const PX_OFF_COLOR = "#000000";
 
 const MS_PER_SEC = 1000;
@@ -113,14 +113,12 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
-    this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0)
-    );
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
     this.running = true;
+    this.clearDisplay();
     this.copyCharData();
   }
 
@@ -371,9 +369,8 @@ export class Chip8Interpreter {
       for (let col = 0; col < 8; col++) {
         const px = (rowByte >>> (7 - col)) & 1;
         const pxX = (xCoord + col) % DISP_WIDTH;
-        const oldPx = this.display[pxY][pxX];
+        if (this.display[pxY][pxX] === 1 && px === 1) this.v[0xf] = 1;
         this.display[pxY][pxX] ^= px;
-        if (oldPx === 1 && px === 1) this.v[0xf] = 1;
       }
     }
   }

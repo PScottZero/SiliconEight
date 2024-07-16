@@ -181,7 +181,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        overflow: boolean,
+        overflow: boolean
       ): string => {
         this.chip8.reset();
 
@@ -211,7 +211,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        underflow: boolean,
+        underflow: boolean
       ): string => {
         this.chip8.reset();
 
@@ -260,7 +260,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        underflow: boolean,
+        underflow: boolean
       ): string => {
         this.chip8.reset();
 
@@ -346,6 +346,83 @@ export class Chip8Tests {
       this.chip8.v[0] = 0x01;
       this.chip8.step();
       results += this.expectPCToEqual(0x000);
+
+      return results;
+    });
+
+    this.test("Set PC = V0 + NNN", () => {
+      this.chip8.mem[0x200] = 0xbf;
+      this.chip8.mem[0x201] = 0x00;
+      this.chip8.mem[0xffe] = 0xbf;
+      this.chip8.mem[0xfff] = 0xff;
+
+      this.chip8.v[0] = 0xfe;
+      this.chip8.step();
+      let results = this.expectPCToEqual(0xffe);
+
+      this.chip8.v[0] = 0x01;
+      this.chip8.step();
+      results += this.expectPCToEqual(0x000);
+
+      return results;
+    });
+
+    this.test("Draw Sprite", async () => {
+      this.chip8.mem[0x200] = 0xda;
+      this.chip8.mem[0x201] = 0xbf;
+      this.chip8.mem[0x202] = 0x12;
+      this.chip8.mem[0x203] = 0x00;
+
+      const sprite1Addr = 0x300;
+      for (let i = 0; i < 8; i++) {
+        this.chip8.mem[sprite1Addr + 2 * i] = 0xaa;
+        this.chip8.mem[sprite1Addr + 2 * i + 1] = 0x55;
+      }
+
+      const sprite2Addr = 0x310;
+      for (let i = 0; i < 8; i++) {
+        this.chip8.mem[sprite2Addr + 2 * i] = 0x55;
+        this.chip8.mem[sprite2Addr + 2 * i + 1] = 0xaa;
+      }
+
+      this.chip8.v[0xa] = 0;
+      this.chip8.v[0xb] = 0;
+
+      this.chip8.i = sprite1Addr;
+      this.chip8.step();
+      this.chip8.step();
+      let results = this.expectVXToEqual(0xf, 0);
+
+      this.chip8.renderFrame();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      this.chip8.i = sprite2Addr;
+      this.chip8.step();
+      this.chip8.step();
+      results += this.expectVXToEqual(0xf, 0);
+
+      this.chip8.renderFrame();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      this.chip8.i = sprite1Addr;
+      this.chip8.step();
+      this.chip8.step();
+      results += this.expectVXToEqual(0xf, 1);
+
+      this.chip8.renderFrame();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      this.chip8.v[0xa] = 57;
+      this.chip8.v[0xb] = 30;
+      this.chip8.i = sprite2Addr;
+      this.chip8.step();
+      this.chip8.step();
+      results += this.expectVXToEqual(0xf, 0);
+
+      this.chip8.renderFrame();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      console.log(results);
 
       return results;
     });
