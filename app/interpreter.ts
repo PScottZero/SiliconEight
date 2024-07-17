@@ -1,6 +1,7 @@
 const MEM_SIZE = 0x1000;
 const START_ADDR = 0x200;
 const REG_COUNT = 16;
+const MIN_SOUND_LENGTH = 2;
 
 const OP_MASK = 0xf000;
 const OP_SHIFT = 12;
@@ -77,6 +78,8 @@ export class Chip8Interpreter {
   keyReg: number; // used for wait for key press opcode
   delay: number; // 8-bit delay timer
   sound: number; // 8-bit sound timer
+  soundPlaying: boolean; // is sound currently playing
+  oscillator: OscillatorNode; // oscillator for playing sound
   running: boolean; // start + stop interpreter
 
   constructor(ctx: CanvasRenderingContext2D) {
@@ -93,6 +96,8 @@ export class Chip8Interpreter {
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
+    this.soundPlaying = false;
+    this.oscillator = this.newOscillator();
     this.running = true;
     this.copyCharData();
   }
@@ -117,6 +122,9 @@ export class Chip8Interpreter {
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
+    this.soundPlaying = false;
+    if (this.soundPlaying) this.oscillator.stop();
+    this.oscillator = this.newOscillator();
     this.running = true;
     this.clearDisplay();
     this.copyCharData();
@@ -160,7 +168,27 @@ export class Chip8Interpreter {
     }
   }
 
+  newOscillator(): OscillatorNode {
+    const ctx = new AudioContext();
+
+    const volume = ctx.createGain();
+    volume.connect(ctx.destination);
+    volume.gain.value = 0.05;
+
+    const oscillator = ctx.createOscillator();
+    oscillator.type = "square";
+    oscillator.frequency.value = 493;
+    oscillator.connect(volume);
+
+    return oscillator;
+  }
+
   step() {
+    if (this.sound == 0 && this.soundPlaying) {
+      this.oscillator.stop();
+      this.soundPlaying = false;
+    }
+
     if (this.skipIfWaitingForKeyPress()) return;
 
     const hi = this.mem[this.pc++];
@@ -229,7 +257,7 @@ export class Chip8Interpreter {
             this.v[x] += this.v[y];
             break;
           case 0x5:
-            this.v[0xf] = this.v[x] < this.v[y] ? 0 : 1;
+            this.v[0xf] = this.v[x] > this.v[y] ? 1 : 0;
             this.v[x] -= this.v[y];
             break;
           case 0x6:
@@ -237,7 +265,7 @@ export class Chip8Interpreter {
             this.v[x] >>>= 1;
             break;
           case 0x7:
-            this.v[0xf] = this.v[y] < this.v[x] ? 0 : 1;
+            this.v[0xf] = this.v[y] > this.v[x] ? 1 : 0;
             this.v[x] = this.v[y] - this.v[x];
             break;
           case 0xe:
@@ -280,7 +308,6 @@ export class Chip8Interpreter {
             this.v[x] = this.delay;
             break;
           case 0x0a:
-            console.log("Waiting for keypress...");
             this.keyReg = x;
             break;
           case 0x15:
@@ -288,6 +315,12 @@ export class Chip8Interpreter {
             break;
           case 0x18:
             this.sound = this.v[x];
+            if (this.sound > 0) {
+              if (this.soundPlaying) this.oscillator.stop();
+              this.oscillator = this.newOscillator();
+              this.soundPlaying = this.sound > 0;
+              this.oscillator.start();
+            }
             break;
           case 0x1e:
             this.i += this.v[x];
@@ -401,7 +434,6 @@ export class Chip8Interpreter {
     const key = this.getFirstPressedKey();
     if (key < 0) return true;
 
-    console.log("Accepted key press:", key);
     this.v[this.keyReg] = key;
     this.keys[key] = false;
     this.keyReg = -1;
