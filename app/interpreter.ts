@@ -81,6 +81,9 @@ export class Chip8Interpreter {
   soundPlaying: boolean; // is sound currently playing
   oscillator: OscillatorNode; // oscillator for playing sound
   running: boolean; // start + stop interpreter
+  jumpOffsetUseVx: boolean; // use vx instead of v0 in jump with offset
+  shiftUseVy: boolean; // set vx to vy before shift
+  regIncI: boolean; // increment i in register dump + load
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -90,7 +93,7 @@ export class Chip8Interpreter {
     this.pc = START_ADDR;
     this.i = 0;
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0)
+      Array<number>(DISP_WIDTH).fill(0),
     );
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
@@ -99,6 +102,9 @@ export class Chip8Interpreter {
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
     this.running = true;
+    this.shiftUseVy = false;
+    this.jumpOffsetUseVx = false;
+    this.regIncI = false;
     this.copyCharData();
   }
 
@@ -126,6 +132,9 @@ export class Chip8Interpreter {
     if (this.soundPlaying) this.oscillator.stop();
     this.oscillator = this.newOscillator();
     this.running = true;
+    this.shiftUseVy = false;
+    this.jumpOffsetUseVx = false;
+    this.regIncI = false;
     this.clearDisplay();
     this.copyCharData();
   }
@@ -202,6 +211,7 @@ export class Chip8Interpreter {
     const x = (opcode & X_MASK) >>> X_SHIFT;
     const y = (opcode & Y_MASK) >>> Y_SHIFT;
 
+    let temp = 0;
     switch (op) {
       case 0x0:
         switch (nnn) {
@@ -245,32 +255,42 @@ export class Chip8Interpreter {
             break;
           case 0x1:
             this.v[x] |= this.v[y];
+            this.v[0xf] = 0;
             break;
           case 0x2:
             this.v[x] &= this.v[y];
+            this.v[0xf] = 0;
             break;
           case 0x3:
             this.v[x] ^= this.v[y];
+            this.v[0xf] = 0;
             break;
           case 0x4:
-            this.v[0xf] = this.v[x] + this.v[y] > 0xff ? 1 : 0;
+            temp = this.v[x] + this.v[y] > 0xff ? 1 : 0;
             this.v[x] += this.v[y];
+            this.v[0xf] = temp;
             break;
           case 0x5:
-            this.v[0xf] = this.v[x] > this.v[y] ? 1 : 0;
+            temp = this.v[x] < this.v[y] ? 0 : 1;
             this.v[x] -= this.v[y];
+            this.v[0xf] = temp;
             break;
           case 0x6:
-            this.v[0xf] = this.v[x] & 1;
+            if (this.shiftUseVy) this.v[x] = this.v[y];
+            temp = this.v[x] & 1;
             this.v[x] >>>= 1;
+            this.v[0xf] = temp;
             break;
           case 0x7:
-            this.v[0xf] = this.v[y] > this.v[x] ? 1 : 0;
+            temp = this.v[y] < this.v[x] ? 0 : 1;
             this.v[x] = this.v[y] - this.v[x];
+            this.v[0xf] = temp;
             break;
           case 0xe:
-            this.v[0xf] = (this.v[x] >>> MSB_SHIFT) & 1;
+            if (this.shiftUseVy) this.v[x] = this.v[y];
+            temp = (this.v[x] >>> MSB_SHIFT) & 1;
             this.v[x] <<= 1;
+            this.v[0xf] = temp;
             break;
         }
         break;
@@ -281,7 +301,8 @@ export class Chip8Interpreter {
         this.i = nnn;
         break;
       case 0xb:
-        this.pc = (this.v[0] + nnn) & NNN_MASK;
+        temp = this.jumpOffsetUseVx ? this.v[x] : this.v[0];
+        this.pc = (temp + nnn) & NNN_MASK;
         break;
       case 0xc:
         this.v[x] = Math.floor(Math.random() * 256) & nn;
@@ -336,11 +357,13 @@ export class Chip8Interpreter {
             for (let reg = 0; reg <= x; reg++) {
               this.mem[this.i + reg] = this.v[reg];
             }
+            if (this.regIncI) this.i += x + 1;
             break;
           case 0x65:
             for (let reg = 0; reg <= x; reg++) {
               this.v[reg] = this.mem[this.i + reg];
             }
+            if (this.regIncI) this.i += x + 1;
             break;
           default:
             this.invalidOpcode(opcode);
@@ -386,31 +409,34 @@ export class Chip8Interpreter {
           col * DISP_SCALE,
           row * DISP_SCALE,
           DISP_SCALE,
-          DISP_SCALE
+          DISP_SCALE,
         );
       }
     }
   }
 
   drawSprite(x: number, y: number, n: number) {
-    this.v[0xf] = 0;
-    const xCoord = this.v[x];
-    const yCoord = this.v[y];
+    let vf = 0;
+    const xCoord = this.v[x] % DISP_WIDTH;
+    const yCoord = this.v[y] % DISP_HEIGHT;
     for (let row = 0; row < n; row++) {
+      let pxY = yCoord + row;
+      if (pxY >= DISP_HEIGHT) continue;
       let rowByte = this.mem[this.i + row];
-      const pxY = (yCoord + row) % DISP_HEIGHT;
       for (let col = 0; col < 8; col++) {
+        let pxX = xCoord + col;
+        if (pxX >= DISP_WIDTH) continue;
         const px = (rowByte >>> (7 - col)) & 1;
-        const pxX = (xCoord + col) % DISP_WIDTH;
-        if (this.display[pxY][pxX] === 1 && px === 1) this.v[0xf] = 1;
+        if (this.display[pxY][pxX] === 1 && px === 1) vf = 1;
         this.display[pxY][pxX] ^= px;
       }
     }
+    this.v[0xf] = vf;
   }
 
   clearDisplay() {
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0)
+      Array<number>(DISP_WIDTH).fill(0),
     );
   }
 

@@ -181,7 +181,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        overflow: boolean
+        overflow: boolean,
       ): string => {
         this.chip8.reset();
 
@@ -211,7 +211,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        underflow: boolean
+        underflow: boolean,
       ): string => {
         this.chip8.reset();
 
@@ -260,7 +260,7 @@ export class Chip8Tests {
         xVal: number,
         yVal: number,
         expected: number,
-        underflow: boolean
+        underflow: boolean,
       ): string => {
         this.chip8.reset();
 
@@ -367,62 +367,130 @@ export class Chip8Tests {
       return results;
     });
 
-    this.test("Draw Sprite", async () => {
-      this.chip8.mem[0x200] = 0xda;
-      this.chip8.mem[0x201] = 0xbf;
+    this.test("Skip If Key VX Pressed", () => {
+      this.chip8.mem[0x200] = 0xea;
+      this.chip8.mem[0x201] = 0x9e;
+      this.chip8.mem[0x202] = 0xea;
+      this.chip8.mem[0x203] = 0x9e;
+
+      this.chip8.v[0xa] = 0xf;
+      this.chip8.keys[0xf] = false;
+      this.chip8.step();
+      let results = this.expectPCToEqual(0x202);
+
+      this.chip8.keys[0xf] = true;
+      this.chip8.step();
+      results += this.expectPCToEqual(0x206);
+
+      return results;
+    });
+
+    this.test("Skip If Key VX Not Pressed", () => {
+      this.chip8.mem[0x200] = 0xea;
+      this.chip8.mem[0x201] = 0xa1;
+      this.chip8.mem[0x202] = 0xea;
+      this.chip8.mem[0x203] = 0xa1;
+
+      this.chip8.v[0xa] = 0xf;
+      this.chip8.keys[0xf] = true;
+      this.chip8.step();
+      let results = this.expectPCToEqual(0x202);
+
+      this.chip8.keys[0xf] = false;
+      this.chip8.step();
+      results += this.expectPCToEqual(0x206);
+
+      return results;
+    });
+
+    this.test("Set VX = Delay", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x07;
+
+      this.chip8.delay = 0xff;
+      this.chip8.step();
+      let results = this.expectVXToEqual(0xa, 0xff);
+
+      return results;
+    });
+
+    this.test("Wait For Key Press", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x0a;
       this.chip8.mem[0x202] = 0x12;
       this.chip8.mem[0x203] = 0x00;
 
-      const sprite1Addr = 0x300;
-      for (let i = 0; i < 8; i++) {
-        this.chip8.mem[sprite1Addr + 2 * i] = 0xaa;
-        this.chip8.mem[sprite1Addr + 2 * i + 1] = 0x55;
-      }
-
-      const sprite2Addr = 0x310;
-      for (let i = 0; i < 8; i++) {
-        this.chip8.mem[sprite2Addr + 2 * i] = 0x55;
-        this.chip8.mem[sprite2Addr + 2 * i + 1] = 0xaa;
-      }
-
-      this.chip8.v[0xa] = 0;
-      this.chip8.v[0xb] = 0;
-
-      this.chip8.i = sprite1Addr;
       this.chip8.step();
       this.chip8.step();
-      let results = this.expectVXToEqual(0xf, 0);
+      let results = this.expectPCToEqual(0x202);
 
-      this.chip8.renderFrame();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      this.chip8.i = sprite2Addr;
+      this.chip8.keys[0xf] = true;
       this.chip8.step();
+      results += this.expectPCToEqual(0x200);
+      results += this.expectVXToEqual(0xa, 0xf);
+
+      return results;
+    });
+
+    this.test("Set Delay = VX", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x15;
+
+      this.chip8.v[0xa] = 0xff;
       this.chip8.step();
-      results += this.expectVXToEqual(0xf, 0);
+      let results = this.expectDelayToEqual(0xff);
 
-      this.chip8.renderFrame();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return results;
+    });
 
-      this.chip8.i = sprite1Addr;
+    this.test("Set Sound = VX", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x18;
+
+      this.chip8.v[0xa] = 0xff;
       this.chip8.step();
+      let results = this.expectSoundToEqual(0xff);
+
+      return results;
+    });
+
+    this.test("Set I += VX", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x1e;
+      this.chip8.mem[0x202] = 0xfa;
+      this.chip8.mem[0x203] = 0x1e;
+
+      this.chip8.i = 0x101;
+      this.chip8.v[0xa] = 0xff;
       this.chip8.step();
-      results += this.expectVXToEqual(0xf, 1);
+      let results = this.expectIToEqual(0x200);
 
-      this.chip8.renderFrame();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      this.chip8.v[0xa] = 57;
-      this.chip8.v[0xb] = 30;
-      this.chip8.i = sprite2Addr;
+      this.chip8.i = 0xfff;
+      this.chip8.v[0xa] = 0xff;
       this.chip8.step();
+      results += this.expectIToEqual(0x0fe);
+
+      return results;
+    });
+
+    this.test("Set I = VX", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x29;
+
+      this.chip8.v[0xa] = 0x01;
       this.chip8.step();
-      results += this.expectVXToEqual(0xf, 0);
+      let results = this.expectIToEqual(0x05);
 
-      this.chip8.renderFrame();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return results;
+    });
 
-      console.log(results);
+    this.test("Binary Coded Decimal", () => {
+      this.chip8.mem[0x200] = 0xfa;
+      this.chip8.mem[0x201] = 0x29;
+
+      this.chip8.v[0xa] = 0x01;
+      this.chip8.step();
+      let results = this.expectIToEqual(0x05);
 
       return results;
     });
@@ -459,5 +527,21 @@ export class Chip8Tests {
     return vxHex === valueHex
       ? `PASS v[${xHex}] = ${vxHex}\n`
       : `FAIL v[${xHex}] = ${vxHex} != ${valueHex}\n`;
+  }
+
+  expectDelayToEqual(value: number): string {
+    let delayHex = this.chip8.delay.toString(16);
+    let valueHex = value.toString(16);
+    return delayHex === valueHex
+      ? `PASS delay = ${delayHex}\n`
+      : `FAIL delay = ${delayHex} != ${valueHex}\n`;
+  }
+
+  expectSoundToEqual(value: number): string {
+    let soundHex = this.chip8.sound.toString(16);
+    let valueHex = value.toString(16);
+    return soundHex === valueHex
+      ? `PASS sound = ${soundHex}\n`
+      : `FAIL sound = ${soundHex} != ${valueHex}\n`;
   }
 }

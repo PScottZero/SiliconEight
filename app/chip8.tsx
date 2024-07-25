@@ -8,9 +8,16 @@ import {
   DISP_WIDTH,
 } from "./interpreter";
 import styles from "./chip8.module.css";
-import { Chip8Tests } from "./test";
+// import { Chip8Tests } from "./test";
 
 const PROGRAMS = new Map<string, string>([
+  // ["Test 1: Chip-8 Logo", "tests/1-chip8-logo.ch8"],
+  // ["Test 2: IBM Logo", "tests/2-ibm-logo.ch8"],
+  // ["Test 3: Corax+", "tests/3-corax+.ch8"],
+  // ["Test 4: Flags", "tests/4-flags.ch8"],
+  // ["Test 5: Quirks", "tests/5-quirks.ch8"],
+  // ["Test 6: Keypad", "tests/6-keypad.ch8"],
+  // ["Test 7: Beep", "tests/7-beep.ch8"],
   ["15 Puzzle", "15 Puzzle [Roger Ivie].ch8"],
   ["Addition Problems", "Addition Problems [Paul C. Moews].ch8"],
   ["Airplane", "Airplane.ch8"],
@@ -105,6 +112,9 @@ const PROGRAMS = new Map<string, string>([
   ["ZeroPong", "ZeroPong [zeroZshadow, 2007].ch8"],
 ]);
 
+const shiftUseVyPrograms = ["Test 5: Quirks"];
+const regIncIPrograms = ["Animal Race", "Vertical Brix", "Test 5: Quirks"];
+
 export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
@@ -115,6 +125,8 @@ export default function Chip8() {
     chip8.current!.running = false;
     await new Promise((resolve) => setTimeout(resolve, 100));
     chip8.current!.reset();
+    chip8.current!.shiftUseVy = shiftUseVyPrograms.includes(program);
+    chip8.current!.regIncI = regIncIPrograms.includes(program);
     await chip8.current!.run(programPath);
 
     let descriptionPath = programPath.replace(".ch8", ".txt");
