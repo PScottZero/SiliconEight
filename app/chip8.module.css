@@ -12,18 +12,47 @@
   grid-template-columns: 22rem 1fr;
   gap: var(--gap-size);
   padding: var(--gap-size);
-  background: var(--primary-color);
   width: 100vw;
   height: 100vh;
 }
 
 .titleBar {
   grid-area: titleBar;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: black;
+  line-height: 3rem;
+}
+
+.titleBar span {
   font-weight: bold;
+  font-size: var(--font-size);
+  padding-left: var(--padding-size);
+  width: auto;
+}
+
+.colorPickers {
+  float: right;
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.colorPickerIcon {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  margin-right: 0.5rem;
+}
+
+.colorPickerIcon:hover {
+  border: var(--gap-size) solid white !important;
+}
+
+.colorPicker {
+  position: absolute;
+  top: 2.25rem;
+  transform: translateX(calc(-100% + 5rem));
+}
+
+.colorPicker input {
+  width: 100%;
   font-size: var(--font-size);
 }
 
@@ -49,19 +78,16 @@
   height: 100%;
   padding: var(--padding-size);
   overflow: hidden;
-  background: black;
 }
 
 .display canvas {
   max-width: 100%;
   max-height: 100%;
   aspect-ratio: 2;
-  background: black;
 }
 
 .description {
   grid-area: description;
-  background: black;
   padding: var(--padding-size);
   font-weight: bold;
   font-size: var(--font-size);

@@ -18,8 +18,6 @@ const BYTE_SHIFT = 8;
 export const DISP_WIDTH = 64;
 export const DISP_HEIGHT = 32;
 export const DISP_SCALE = 64;
-const PX_ON_COLOR = "#00ffff";
-const PX_OFF_COLOR = "#000000";
 
 const MS_PER_SEC = 1000;
 const OPS_PER_SEC = 500;
@@ -74,6 +72,8 @@ export class Chip8Interpreter {
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
   display: Array<Array<number>>; // 64x32 monochrome display
+  onColor: string; // pixel on color
+  offColor: string; // pixel off color
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // used for wait for key press opcode
   delay: number; // 8-bit delay timer
@@ -85,7 +85,11 @@ export class Chip8Interpreter {
   shiftUseVy: boolean; // set vx to vy before shift
   regIncI: boolean; // increment i in register dump + load
 
-  constructor(ctx: CanvasRenderingContext2D) {
+  constructor(
+    ctx: CanvasRenderingContext2D,
+    onColor: string,
+    offColor: string,
+  ) {
     this.ctx = ctx;
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
@@ -95,6 +99,8 @@ export class Chip8Interpreter {
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
       Array<number>(DISP_WIDTH).fill(0),
     );
+    this.onColor = onColor;
+    this.offColor = offColor;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -403,8 +409,8 @@ export class Chip8Interpreter {
     for (let row = 0; row < DISP_HEIGHT; row++) {
       for (let col = 0; col < DISP_WIDTH; col++) {
         this.ctx.fillStyle = this.display[row][col]
-          ? PX_ON_COLOR
-          : PX_OFF_COLOR;
+          ? this.onColor
+          : this.offColor;
         this.ctx.fillRect(
           col * DISP_SCALE,
           row * DISP_SCALE,

@@ -1,10 +1,10 @@
 import { Chip8Interpreter } from "./interpreter";
 
 export class Chip8Tests {
-  chip8: Chip8Interpreter;
+  static chip8: Chip8Interpreter;
 
-  constructor(ctx: CanvasRenderingContext2D) {
-    this.chip8 = new Chip8Interpreter(ctx);
+  static runTests() {
+    this.chip8 = new Chip8Interpreter(new CanvasRenderingContext2D(), "", "");
 
     this.test("Subroutine Call + Return", () => {
       this.chip8.mem[0x200] = 0x2f;
@@ -496,7 +496,7 @@ export class Chip8Tests {
     });
   }
 
-  test(name: string, f: Function) {
+  static test(name: string, f: Function) {
     this.chip8.reset();
     let results = f();
     if (results.length === 0) results += "PASS\n";
@@ -504,7 +504,7 @@ export class Chip8Tests {
     console.log(results);
   }
 
-  expectPCToEqual(value: number): string {
+  static expectPCToEqual(value: number): string {
     let pcHex = this.chip8.pc.toString(16);
     let valueHex = value.toString(16);
     return pcHex === valueHex
@@ -512,7 +512,7 @@ export class Chip8Tests {
       : `FAIL pc = ${pcHex} != ${valueHex}\n`;
   }
 
-  expectIToEqual(value: number): string {
+  static expectIToEqual(value: number): string {
     let iHex = this.chip8.i.toString(16);
     let valueHex = value.toString(16);
     return iHex === valueHex
@@ -520,7 +520,7 @@ export class Chip8Tests {
       : `FAIL i = ${iHex} != ${valueHex}\n`;
   }
 
-  expectVXToEqual(x: number, value: number): string {
+  static expectVXToEqual(x: number, value: number): string {
     let xHex = x.toString(16);
     let vxHex = this.chip8.v[x].toString(16);
     let valueHex = value.toString(16);
@@ -529,7 +529,7 @@ export class Chip8Tests {
       : `FAIL v[${xHex}] = ${vxHex} != ${valueHex}\n`;
   }
 
-  expectDelayToEqual(value: number): string {
+  static expectDelayToEqual(value: number): string {
     let delayHex = this.chip8.delay.toString(16);
     let valueHex = value.toString(16);
     return delayHex === valueHex
@@ -537,7 +537,7 @@ export class Chip8Tests {
       : `FAIL delay = ${delayHex} != ${valueHex}\n`;
   }
 
-  expectSoundToEqual(value: number): string {
+  static expectSoundToEqual(value: number): string {
     let soundHex = this.chip8.sound.toString(16);
     let valueHex = value.toString(16);
     return soundHex === valueHex

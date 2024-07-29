@@ -8,7 +8,10 @@ import {
   DISP_WIDTH,
 } from "./interpreter";
 import styles from "./chip8.module.css";
-// import { Chip8Tests } from "./test";
+import { HexColorInput, HexColorPicker } from "react-colorful";
+import { Chip8Tests } from "./test";
+import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+import { setCookie } from "cookies-next";
 
 const PROGRAMS = new Map<string, string>([
   // ["Test 1: Chip-8 Logo", "tests/1-chip8-logo.ch8"],
@@ -115,10 +118,19 @@ const PROGRAMS = new Map<string, string>([
 const shiftUseVyPrograms = ["Test 5: Quirks"];
 const regIncIPrograms = ["Animal Race", "Vertical Brix", "Test 5: Quirks"];
 
-export default function Chip8() {
+type Chip8Props = {
+  initOnColor: string;
+  initOffColor: string;
+};
+
+export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
   const [description, setDescription] = useState<string>("");
+  const [onColor, setOnColor] = useState<string>(initOnColor);
+  const [offColor, setOffColor] = useState<string>(initOffColor);
+  const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
+  const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
 
   const runProgram = async (program: string) => {
     let programPath = PROGRAMS.get(program)!;
@@ -138,8 +150,8 @@ export default function Chip8() {
 
   useEffect(() => {
     const ctx = canvas.current!.getContext("2d")!;
-    chip8.current = new Chip8Interpreter(ctx);
-    // new Chip8Tests(ctx);
+    chip8.current = new Chip8Interpreter(ctx, onColor, offColor);
+    new Chip8Tests();
 
     const keyDownHandler = (e: KeyboardEvent) =>
       chip8.current!.keyDownHandler(e);
@@ -165,18 +177,81 @@ export default function Chip8() {
     );
   });
 
+  const toggleOnPicker = () => {
+    setShowOnPicker(!showOnPicker);
+    setShowOffPicker(false);
+  };
+
+  const toggleOffPicker = () => {
+    setShowOnPicker(false);
+    setShowOffPicker(!showOffPicker);
+  };
+
+  const _setOnColor = (color: string) => {
+    chip8.current!.onColor = color;
+    setCookie("on", color);
+    setOnColor(color);
+  };
+
+  const _setOffColor = (color: string) => {
+    chip8.current!.offColor = color;
+    setCookie("off", color);
+    setOffColor(color);
+  };
+
+  const dynamicStyle = {
+    color: onColor,
+    backgroundColor: offColor,
+  };
+
   return (
-    <div className={styles.chip8}>
-      <div className={styles.titleBar}>CHIP-8 Interpreter [WIP]</div>
-      <div className={styles.programList}>{programList}</div>
-      <div className={styles.display}>
+    <div className={styles.chip8} style={{ backgroundColor: onColor }}>
+      <div className={styles.titleBar} style={dynamicStyle}>
+        <span>CHIP-8 Interpreter</span>
+        <div className={styles.colorPickers}>
+          <div
+            className={styles.colorPickerIcon}
+            style={{
+              backgroundColor: onColor,
+              border: `var(--gap-size) solid ${onColor}`,
+            }}
+            onClick={toggleOnPicker}
+          />
+          <div
+            className={styles.colorPickerIcon}
+            style={{
+              backgroundColor: offColor,
+              border: `var(--gap-size) solid ${onColor}`,
+            }}
+            onClick={toggleOffPicker}
+          />
+          {showOnPicker && (
+            <div className={styles.colorPicker}>
+              <HexColorPicker color={onColor} onChange={_setOnColor} />
+              <HexColorInput color={onColor} onChange={_setOnColor} />
+            </div>
+          )}
+          {showOffPicker && (
+            <div className={styles.colorPicker}>
+              <HexColorPicker color={offColor} onChange={_setOffColor} />
+              <HexColorInput color={onColor} onChange={_setOffColor} />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className={styles.programList} style={dynamicStyle}>
+        {programList}
+      </div>
+      <div className={styles.display} style={dynamicStyle}>
         <canvas
           ref={canvas}
           width={DISP_WIDTH * DISP_SCALE}
           height={DISP_HEIGHT * DISP_SCALE}
         ></canvas>
       </div>
-      <div className={styles.description}>{description}</div>
+      <div className={styles.description} style={dynamicStyle}>
+        {description}
+      </div>
     </div>
   );
 }
