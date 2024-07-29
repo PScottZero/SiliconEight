@@ -10,7 +10,6 @@ import {
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 // import { Chip8Tests } from "./test";
-import { setCookie } from "cookies-next";
 
 const PROGRAMS = new Map<string, string>([
   // ["Test 1: Chip-8 Logo", "tests/1-chip8-logo.ch8"],
@@ -117,17 +116,15 @@ const PROGRAMS = new Map<string, string>([
 const shiftUseVyPrograms = ["Test 5: Quirks"];
 const regIncIPrograms = ["Animal Race", "Vertical Brix", "Test 5: Quirks"];
 
-type Chip8Props = {
-  initOnColor: string;
-  initOffColor: string;
-};
+const DEFAULT_ON_COLOR = "#00ffff";
+const DEFAULT_OFF_COLOR = "#000000";
 
-export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
+export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
   const [description, setDescription] = useState<string>("");
-  const [onColor, setOnColor] = useState<string>(initOnColor);
-  const [offColor, setOffColor] = useState<string>(initOffColor);
+  const [onColor, setOnColor] = useState<string>(DEFAULT_ON_COLOR);
+  const [offColor, setOffColor] = useState<string>(DEFAULT_OFF_COLOR);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
 
@@ -172,7 +169,7 @@ export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
     programList.push(
       <div key={key} onClick={() => runProgram(key)}>
         {key}
-      </div>
+      </div>,
     );
   });
 
@@ -188,13 +185,11 @@ export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
 
   const _setOnColor = (color: string) => {
     chip8.current!.onColor = color;
-    setCookie("on", color);
     setOnColor(color);
   };
 
   const _setOffColor = (color: string) => {
     chip8.current!.offColor = color;
-    setCookie("off", color);
     setOffColor(color);
   };
 
