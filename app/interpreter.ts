@@ -1,7 +1,6 @@
 const MEM_SIZE = 0x1000;
 const START_ADDR = 0x200;
 const REG_COUNT = 16;
-const MIN_SOUND_LENGTH = 2;
 
 const OP_MASK = 0xf000;
 const OP_SHIFT = 12;
@@ -134,8 +133,8 @@ export class Chip8Interpreter {
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
-    this.soundPlaying = false;
     if (this.soundPlaying) this.oscillator.stop();
+    this.soundPlaying = false;
     this.oscillator = this.newOscillator();
     this.running = true;
     this.shiftUseVy = false;

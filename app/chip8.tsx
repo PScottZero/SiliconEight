@@ -9,7 +9,7 @@ import {
 } from "./interpreter";
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import { doc } from "prettier";
+import JSCookie from "js-cookie";
 // import { Chip8Tests } from "./test";
 
 const PROGRAMS = new Map<string, string>([
@@ -120,6 +120,15 @@ const regIncIPrograms = ["Animal Race", "Vertical Brix", "Test 5: Quirks"];
 const DEFAULT_ON_COLOR = "#00ffff";
 const DEFAULT_OFF_COLOR = "#000000";
 
+const ON_COOKIE = "on";
+const OFF_COOKIE = "off";
+
+function getColorCookie(key: string): string {
+  const defaultColor = key === "on" ? DEFAULT_ON_COLOR : DEFAULT_OFF_COLOR;
+  if (JSCookie.get(key) === undefined) JSCookie.set(key, defaultColor);
+  return JSCookie.get(key) ?? defaultColor;
+}
+
 export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
@@ -146,7 +155,10 @@ export default function Chip8() {
   };
 
   useEffect(() => {
-    console.log(document.cookie);
+    const onColor = getColorCookie(ON_COOKIE);
+    const offColor = getColorCookie(OFF_COOKIE);
+    setOnColor(onColor);
+    setOffColor(offColor);
 
     const ctx = canvas.current!.getContext("2d")!;
     chip8.current = new Chip8Interpreter(ctx, onColor, offColor);
@@ -188,11 +200,13 @@ export default function Chip8() {
 
   const _setOnColor = (color: string) => {
     chip8.current!.onColor = color;
+    JSCookie.set(ON_COOKIE, color);
     setOnColor(color);
   };
 
   const _setOffColor = (color: string) => {
     chip8.current!.offColor = color;
+    JSCookie.set(OFF_COOKIE, color);
     setOffColor(color);
   };
 
