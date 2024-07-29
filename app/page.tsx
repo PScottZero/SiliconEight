@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+"use server";
 
 import styles from "./page.module.css";
 import Chip8 from "./chip8";
@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 const DEFAULT_ON_COLOR = "#00ffff";
 const DEFAULT_OFF_COLOR = "#000000";
 
-export default function Home() {
+export default async function Home() {
   return (
     <main className={styles.main}>
       <Chip8
