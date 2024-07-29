@@ -9,8 +9,7 @@ import {
 } from "./interpreter";
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import { Chip8Tests } from "./test";
-import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+// import { Chip8Tests } from "./test";
 import { setCookie } from "cookies-next";
 
 const PROGRAMS = new Map<string, string>([
@@ -151,7 +150,7 @@ export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
   useEffect(() => {
     const ctx = canvas.current!.getContext("2d")!;
     chip8.current = new Chip8Interpreter(ctx, onColor, offColor);
-    new Chip8Tests();
+    // new Chip8Tests();
 
     const keyDownHandler = (e: KeyboardEvent) =>
       chip8.current!.keyDownHandler(e);
@@ -173,7 +172,7 @@ export default function Chip8({ initOnColor, initOffColor }: Chip8Props) {
     programList.push(
       <div key={key} onClick={() => runProgram(key)}>
         {key}
-      </div>,
+      </div>
     );
   });
 
