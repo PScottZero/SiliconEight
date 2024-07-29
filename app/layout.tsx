@@ -1,9 +1,6 @@
-export const dynamic = "force-dynamic";
-
 import type { Metadata } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import { CookiesProvider } from "next-client-cookies/server";
 
 const inter = IBM_Plex_Mono({
   weight: "400",
@@ -26,7 +23,7 @@ export default function RootLayout({
         <link rel="icon" href="img/icons8-electronics-96.png" sizes="any" />
       </head>
       <body className={inter.className} suppressHydrationWarning={true}>
-        <CookiesProvider>{children}</CookiesProvider>
+        {children}
       </body>
     </html>
   );

@@ -9,7 +9,7 @@ import {
 } from "./interpreter";
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import { Cookies, useCookies } from "next-client-cookies";
+import { doc } from "prettier";
 // import { Chip8Tests } from "./test";
 
 const PROGRAMS = new Map<string, string>([
@@ -120,23 +120,12 @@ const regIncIPrograms = ["Animal Race", "Vertical Brix", "Test 5: Quirks"];
 const DEFAULT_ON_COLOR = "#00ffff";
 const DEFAULT_OFF_COLOR = "#000000";
 
-function initColorCookie(cookies: Cookies, key: string, defaultColor: string) {
-  if (cookies.get(key) === undefined) cookies.set(key, defaultColor);
-  return cookies.get(key) ?? defaultColor;
-}
-
 export default function Chip8() {
-  const cookies = useCookies();
-
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
   const [description, setDescription] = useState<string>("");
-  const [onColor, setOnColor] = useState<string>(
-    initColorCookie(cookies, "on", DEFAULT_ON_COLOR)
-  );
-  const [offColor, setOffColor] = useState<string>(
-    initColorCookie(cookies, "off", DEFAULT_OFF_COLOR)
-  );
+  const [onColor, setOnColor] = useState<string>(DEFAULT_ON_COLOR);
+  const [offColor, setOffColor] = useState<string>(DEFAULT_OFF_COLOR);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
 
@@ -157,6 +146,8 @@ export default function Chip8() {
   };
 
   useEffect(() => {
+    console.log(document.cookie);
+
     const ctx = canvas.current!.getContext("2d")!;
     chip8.current = new Chip8Interpreter(ctx, onColor, offColor);
     // new Chip8Tests();
@@ -197,13 +188,11 @@ export default function Chip8() {
 
   const _setOnColor = (color: string) => {
     chip8.current!.onColor = color;
-    cookies.set("on", color);
     setOnColor(color);
   };
 
   const _setOffColor = (color: string) => {
     chip8.current!.offColor = color;
-    cookies.set("off", color);
     setOffColor(color);
   };
 
