@@ -48,7 +48,7 @@
 .colorPicker {
   position: absolute;
   top: 2.25rem;
-  transform: translateX(calc(-100% + 5rem));
+  transform: translateX(calc(-100% + 4.5rem));
 }
 
 .colorPicker input {

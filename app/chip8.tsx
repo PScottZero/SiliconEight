@@ -242,7 +242,7 @@ export default function Chip8() {
           {showOffPicker && (
             <div className={styles.colorPicker}>
               <HexColorPicker color={offColor} onChange={_setOffColor} />
-              <HexColorInput color={onColor} onChange={_setOffColor} />
+              <HexColorInput color={offColor} onChange={_setOffColor} />
             </div>
           )}
         </div>
