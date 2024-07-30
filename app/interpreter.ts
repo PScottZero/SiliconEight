@@ -63,8 +63,32 @@ const KEY_MAP = new Map<string, number>([
   ["v", 0xf],
 ]);
 
+export class Chip8Config {
+  shiftUseVy: boolean; // set vx to vy before shift
+  jumpOffsetUseVx: boolean; // use vx instead of v0 in jump with offset
+  addVxToIUseVf: boolean; // use overflow flag for add to i
+  regDumpLoadIncI: boolean; // increment i in register dump + load
+
+  constructor(
+    shiftUseVy: boolean,
+    jumpOffsetUseVx: boolean,
+    addToIUseVf: boolean,
+    regDumpLoadIncI: boolean
+  ) {
+    this.shiftUseVy = shiftUseVy;
+    this.jumpOffsetUseVx = jumpOffsetUseVx;
+    this.addVxToIUseVf = addToIUseVf;
+    this.regDumpLoadIncI = regDumpLoadIncI;
+  }
+}
+
+export const COSMAC_VIP_CONFIG = new Chip8Config(true, false, false, true);
+export const HP48_CONFIG = new Chip8Config(false, true, true, false);
+
 export class Chip8Interpreter {
+  config: Chip8Config;
   ctx: CanvasRenderingContext2D;
+
   mem: Uint8Array; // 4096 bytes of memory
   stack: Array<number>; // 12-bit address stack
   v: Uint8Array; // 16 8-bit registers
@@ -80,23 +104,23 @@ export class Chip8Interpreter {
   soundPlaying: boolean; // is sound currently playing
   oscillator: OscillatorNode; // oscillator for playing sound
   running: boolean; // start + stop interpreter
-  jumpOffsetUseVx: boolean; // use vx instead of v0 in jump with offset
-  shiftUseVy: boolean; // set vx to vy before shift
-  regIncI: boolean; // increment i in register dump + load
 
   constructor(
+    config: Chip8Config,
     ctx: CanvasRenderingContext2D,
     onColor: string,
-    offColor: string,
+    offColor: string
   ) {
+    this.config = config;
     this.ctx = ctx;
+
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0),
+      Array<number>(DISP_WIDTH).fill(0)
     );
     this.onColor = onColor;
     this.offColor = offColor;
@@ -107,9 +131,6 @@ export class Chip8Interpreter {
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
     this.running = true;
-    this.shiftUseVy = false;
-    this.jumpOffsetUseVx = false;
-    this.regIncI = false;
     this.copyCharData();
   }
 
@@ -123,7 +144,9 @@ export class Chip8Interpreter {
     requestAnimationFrame(() => this.runLoop(startTime, startTime));
   }
 
-  reset() {
+  reset(config: Chip8Config) {
+    this.config = config;
+
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
     this.v = new Uint8Array(REG_COUNT).fill(0);
@@ -137,9 +160,6 @@ export class Chip8Interpreter {
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
     this.running = true;
-    this.shiftUseVy = false;
-    this.jumpOffsetUseVx = false;
-    this.regIncI = false;
     this.clearDisplay();
     this.copyCharData();
   }
@@ -281,7 +301,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0x6:
-            if (this.shiftUseVy) this.v[x] = this.v[y];
+            if (this.config.shiftUseVy) this.v[x] = this.v[y];
             temp = this.v[x] & 1;
             this.v[x] >>>= 1;
             this.v[0xf] = temp;
@@ -292,7 +312,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0xe:
-            if (this.shiftUseVy) this.v[x] = this.v[y];
+            if (this.config.shiftUseVy) this.v[x] = this.v[y];
             temp = (this.v[x] >>> MSB_SHIFT) & 1;
             this.v[x] <<= 1;
             this.v[0xf] = temp;
@@ -306,8 +326,11 @@ export class Chip8Interpreter {
         this.i = nnn;
         break;
       case 0xb:
-        temp = this.jumpOffsetUseVx ? this.v[x] : this.v[0];
-        this.pc = (temp + nnn) & NNN_MASK;
+        if (this.config.jumpOffsetUseVx) {
+          this.pc = this.v[x] + nn;
+        } else {
+          this.pc = (this.v[0] + nnn) & NNN_MASK;
+        }
         break;
       case 0xc:
         this.v[x] = Math.floor(Math.random() * 256) & nn;
@@ -349,6 +372,9 @@ export class Chip8Interpreter {
             }
             break;
           case 0x1e:
+            if (this.config.addVxToIUseVf && this.i + this.v[x] > NNN_MASK) {
+              this.v[0xf] = 1;
+            }
             this.i += this.v[x];
             this.i &= NNN_MASK;
             break;
@@ -362,13 +388,13 @@ export class Chip8Interpreter {
             for (let reg = 0; reg <= x; reg++) {
               this.mem[this.i + reg] = this.v[reg];
             }
-            if (this.regIncI) this.i += x + 1;
+            if (this.config.regDumpLoadIncI) this.i += x + 1;
             break;
           case 0x65:
             for (let reg = 0; reg <= x; reg++) {
               this.v[reg] = this.mem[this.i + reg];
             }
-            if (this.regIncI) this.i += x + 1;
+            if (this.config.regDumpLoadIncI) this.i += x + 1;
             break;
           default:
             this.invalidOpcode(opcode);
@@ -396,7 +422,7 @@ export class Chip8Interpreter {
   }
 
   invalidOpcode(opcode: number) {
-    console.log("Invalid opcode:", opcode);
+    console.log("Invalid opcode:", opcode.toString(16));
     this.running = false;
   }
 
@@ -414,7 +440,7 @@ export class Chip8Interpreter {
           col * DISP_SCALE,
           row * DISP_SCALE,
           DISP_SCALE,
-          DISP_SCALE,
+          DISP_SCALE
         );
       }
     }
@@ -441,7 +467,7 @@ export class Chip8Interpreter {
 
   clearDisplay() {
     this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0),
+      Array<number>(DISP_WIDTH).fill(0)
     );
   }
 
