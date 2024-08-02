@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="img/icons8-electronics-96.png" sizes="any" />
+        <link rel="icon" href="favicon.svg" sizes="any" />
       </head>
       <body className={inter.className} suppressHydrationWarning={true}>
         {children}

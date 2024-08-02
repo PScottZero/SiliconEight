@@ -63,30 +63,24 @@ const KEY_MAP = new Map<string, number>([
   ["v", 0xf],
 ]);
 
-export class Chip8Config {
-  shiftUseVy: boolean; // set vx to vy before shift
-  jumpOffsetUseVx: boolean; // use vx instead of v0 in jump with offset
-  addVxToIUseVf: boolean; // use overflow flag for add to i
-  regDumpLoadIncI: boolean; // increment i in register dump + load
-
-  constructor(
-    shiftUseVy: boolean,
-    jumpOffsetUseVx: boolean,
-    addToIUseVf: boolean,
-    regDumpLoadIncI: boolean
-  ) {
-    this.shiftUseVy = shiftUseVy;
-    this.jumpOffsetUseVx = jumpOffsetUseVx;
-    this.addVxToIUseVf = addToIUseVf;
-    this.regDumpLoadIncI = regDumpLoadIncI;
-  }
+export interface ProgramMetadata {
+  title: string;
+  authors: string;
+  release: string;
+  description: string;
+  platform: string;
+  tickrate: number;
+  logicQuirk: boolean; // 8XY1,8XY2,8XY3: vf = 0 if true else vf unchanged
+  shiftQuirk: boolean; // 8XY6+8XYE: shift vx if true else shift vy
+  jumpQuirk: boolean; // BNNN: pc = xnn + vx if true else pc = nnn + v0
+  wrapQuirk: boolean; // DXYN: wrap sprites if true else clip sprites
+  vBlankQuirk: boolean; // DXYN: wait for next frame before drawing sprite
+  loadStoreQuirk: boolean; // FX55+FX65: i unchanged if true else i += x (+1)
+  loadStoreQuirkAlt: boolean; // FX55+FX65: i += x if true else i += x + 1
 }
 
-export const COSMAC_VIP_CONFIG = new Chip8Config(true, false, false, true);
-export const HP48_CONFIG = new Chip8Config(false, true, true, false);
-
 export class Chip8Interpreter {
-  config: Chip8Config;
+  metadata: ProgramMetadata;
   ctx: CanvasRenderingContext2D;
 
   mem: Uint8Array; // 4096 bytes of memory
@@ -98,20 +92,24 @@ export class Chip8Interpreter {
   onColor: string; // pixel on color
   offColor: string; // pixel off color
   keys: Array<boolean>; // 16 keypad keys
-  keyReg: number; // used for wait for key press opcode
+  keyReg: number; // stores output register while waiting for key press
   delay: number; // 8-bit delay timer
   sound: number; // 8-bit sound timer
   soundPlaying: boolean; // is sound currently playing
   oscillator: OscillatorNode; // oscillator for playing sound
+  waitingForVBlank: boolean; // is the program waiting for v-blank
+  spriteX: number; // stores sprite x coord register while waiting for v-blank
+  spriteY: number; // stores sprite y coord register while waiting for v-blank
+  spriteN: number; // stores the number of sprite rows while waiting for v-blank
   running: boolean; // start + stop interpreter
 
   constructor(
-    config: Chip8Config,
+    metadata: ProgramMetadata,
     ctx: CanvasRenderingContext2D,
     onColor: string,
     offColor: string
   ) {
-    this.config = config;
+    this.metadata = metadata;
     this.ctx = ctx;
 
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
@@ -130,6 +128,10 @@ export class Chip8Interpreter {
     this.sound = 0;
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
+    this.waitingForVBlank = false;
+    this.spriteX = 0;
+    this.spriteY = 0;
+    this.spriteN = 0;
     this.running = true;
     this.copyCharData();
   }
@@ -144,8 +146,8 @@ export class Chip8Interpreter {
     requestAnimationFrame(() => this.runLoop(startTime, startTime));
   }
 
-  reset(config: Chip8Config) {
-    this.config = config;
+  reset(metadata: ProgramMetadata): boolean {
+    this.metadata = metadata;
 
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
@@ -159,9 +161,12 @@ export class Chip8Interpreter {
     if (this.soundPlaying) this.oscillator.stop();
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
+    this.waitingForVBlank = false;
     this.running = true;
     this.clearDisplay();
     this.copyCharData();
+
+    return true;
   }
 
   copyCharData() {
@@ -223,7 +228,7 @@ export class Chip8Interpreter {
       this.soundPlaying = false;
     }
 
-    if (this.skipIfWaitingForKeyPress()) return;
+    if (this.waitingForVBlank || this.skipIfWaitingForKeyPress()) return;
 
     const hi = this.mem[this.pc++];
     const lo = this.mem[this.pc++];
@@ -280,15 +285,15 @@ export class Chip8Interpreter {
             break;
           case 0x1:
             this.v[x] |= this.v[y];
-            this.v[0xf] = 0;
+            if (this.metadata.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x2:
             this.v[x] &= this.v[y];
-            this.v[0xf] = 0;
+            if (this.metadata.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x3:
             this.v[x] ^= this.v[y];
-            this.v[0xf] = 0;
+            if (this.metadata.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x4:
             temp = this.v[x] + this.v[y] > 0xff ? 1 : 0;
@@ -301,7 +306,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0x6:
-            if (this.config.shiftUseVy) this.v[x] = this.v[y];
+            if (!this.metadata.shiftQuirk) this.v[x] = this.v[y];
             temp = this.v[x] & 1;
             this.v[x] >>>= 1;
             this.v[0xf] = temp;
@@ -312,7 +317,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0xe:
-            if (this.config.shiftUseVy) this.v[x] = this.v[y];
+            if (!this.metadata.shiftQuirk) this.v[x] = this.v[y];
             temp = (this.v[x] >>> MSB_SHIFT) & 1;
             this.v[x] <<= 1;
             this.v[0xf] = temp;
@@ -326,11 +331,7 @@ export class Chip8Interpreter {
         this.i = nnn;
         break;
       case 0xb:
-        if (this.config.jumpOffsetUseVx) {
-          this.pc = this.v[x] + nn;
-        } else {
-          this.pc = (this.v[0] + nnn) & NNN_MASK;
-        }
+        this.pc = (this.v[this.metadata.jumpQuirk ? x : 0] + nnn) & NNN_MASK;
         break;
       case 0xc:
         this.v[x] = Math.floor(Math.random() * 256) & nn;
@@ -372,9 +373,10 @@ export class Chip8Interpreter {
             }
             break;
           case 0x1e:
-            if (this.config.addVxToIUseVf && this.i + this.v[x] > NNN_MASK) {
-              this.v[0xf] = 1;
-            }
+            // This code is needed for one game
+            // if (this.i + this.v[x] > NNN_MASK) {
+            //   this.v[0xf] = 1;
+            // }
             this.i += this.v[x];
             this.i &= NNN_MASK;
             break;
@@ -388,13 +390,17 @@ export class Chip8Interpreter {
             for (let reg = 0; reg <= x; reg++) {
               this.mem[this.i + reg] = this.v[reg];
             }
-            if (this.config.regDumpLoadIncI) this.i += x + 1;
+            if (!this.metadata.loadStoreQuirk) {
+              this.i += this.metadata.loadStoreQuirkAlt ? x : x + 1;
+            }
             break;
           case 0x65:
             for (let reg = 0; reg <= x; reg++) {
               this.v[reg] = this.mem[this.i + reg];
             }
-            if (this.config.regDumpLoadIncI) this.i += x + 1;
+            if (!this.metadata.loadStoreQuirk) {
+              this.i += this.metadata.loadStoreQuirkAlt ? x : x + 1;
+            }
             break;
           default:
             this.invalidOpcode(opcode);
@@ -444,18 +450,32 @@ export class Chip8Interpreter {
         );
       }
     }
+    if (this.waitingForVBlank) {
+      this.drawSprite(this.spriteX, this.spriteY, this.spriteN);
+      this.waitingForVBlank = false;
+    }
   }
 
   drawSprite(x: number, y: number, n: number) {
+    if (this.metadata.vBlankQuirk && !this.waitingForVBlank) {
+      this.waitingForVBlank = true;
+      this.spriteX = x;
+      this.spriteY = y;
+      this.spriteN = n;
+      return;
+    }
+
     let vf = 0;
     const xCoord = this.v[x] % DISP_WIDTH;
     const yCoord = this.v[y] % DISP_HEIGHT;
     for (let row = 0; row < n; row++) {
       let pxY = yCoord + row;
+      if (this.metadata.wrapQuirk) pxY %= DISP_HEIGHT;
       if (pxY >= DISP_HEIGHT) continue;
       let rowByte = this.mem[this.i + row];
       for (let col = 0; col < 8; col++) {
         let pxX = xCoord + col;
+        if (this.metadata.wrapQuirk) pxX %= DISP_WIDTH;
         if (pxX >= DISP_WIDTH) continue;
         const px = (rowByte >>> (7 - col)) & 1;
         if (this.display[pxY][pxX] === 1 && px === 1) vf = 1;

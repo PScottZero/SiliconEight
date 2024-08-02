@@ -1,66 +1,70 @@
 "use client";
 
+import programs from "../public/programs.json";
+
 import { ReactElement, useEffect, useRef, useState } from "react";
 import {
   Chip8Interpreter,
   DISP_HEIGHT,
   DISP_SCALE,
   DISP_WIDTH,
-  HP48_CONFIG,
+  ProgramMetadata,
 } from "./interpreter";
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import JSCookie from "js-cookie";
-import { EXCLUDE_PROGRAMS, PROGRAM_CONFIGS, PROGRAMS } from "./programs";
+import React from "react";
 
-const DEFAULT_ON_COLOR = "#00ffff";
-const DEFAULT_OFF_COLOR = "#000000";
+const DEFAULT_ON = "#00ffff";
+const DEFAULT_OFF = "#000000";
 
-const ON_COOKIE = "on";
-const OFF_COOKIE = "off";
+const ON_KEY = "on";
+const OFF_KEY = "off";
 
-const expiration = { expires: 400 };
+const MAZE_IDX = 104;
+
+const SUPPORTED_PLATFORMS = [
+  "originalChip8",
+  "hybridVIP",
+  "modernChip8",
+  "chip8x",
+  "chip48",
+];
 
 function getColorCookie(key: string): string {
-  const defaultColor = key === "on" ? DEFAULT_ON_COLOR : DEFAULT_OFF_COLOR;
-  if (JSCookie.get(key) === undefined) {
-    JSCookie.set(key, defaultColor, expiration);
+  const defaultColor = key === ON_KEY ? DEFAULT_ON : DEFAULT_OFF;
+  if (localStorage.getItem(key) === undefined) {
+    localStorage.setItem(key, defaultColor);
   }
-  return JSCookie.get(key) ?? defaultColor;
+  return localStorage.getItem(key) ?? defaultColor;
 }
 
 export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
   const [description, setDescription] = useState<string>("");
-  const [onColor, setOnColor] = useState<string>(DEFAULT_ON_COLOR);
-  const [offColor, setOffColor] = useState<string>(DEFAULT_OFF_COLOR);
+  const [onColor, setOnColor] = useState<string>(DEFAULT_ON);
+  const [offColor, setOffColor] = useState<string>(DEFAULT_OFF);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
 
-  const runProgram = async (program: string) => {
-    let programPath = PROGRAMS.get(program)!;
-    const config = PROGRAM_CONFIGS.get(program)!;
+  const runProgram = async (idx: number) => {
+    const metadata = programs[idx];
     chip8.current!.running = false;
     await new Promise((resolve) => setTimeout(resolve, 100));
-    chip8.current!.reset(config);
-    await chip8.current!.run(programPath);
-
-    let descriptionPath = programPath.replace(".ch8", ".txt");
-    const res = await fetch("bin/" + encodeURI(descriptionPath));
-    const description = res.ok ? await res.text() : "No description available.";
-
-    setDescription(description);
+    chip8.current!.reset(metadata);
+    await chip8.current!.run(metadata.path);
+    setDescription(metadata.description);
   };
 
   useEffect(() => {
-    const onColor = getColorCookie(ON_COOKIE);
-    const offColor = getColorCookie(OFF_COOKIE);
+    const onColor = getColorCookie(ON_KEY);
+    const offColor = getColorCookie(OFF_KEY);
     setOnColor(onColor);
     setOffColor(offColor);
 
+    const metadata = programs[MAZE_IDX];
     const ctx = canvas.current!.getContext("2d")!;
-    chip8.current = new Chip8Interpreter(HP48_CONFIG, ctx, onColor, offColor);
+    chip8.current = new Chip8Interpreter(metadata, ctx, onColor, offColor);
 
     const keyDownHandler = (e: KeyboardEvent) =>
       chip8.current!.keyDownHandler(e);
@@ -69,7 +73,7 @@ export default function Chip8() {
     document.addEventListener("keydown", keyDownHandler);
     document.addEventListener("keyup", keyUpHandler);
 
-    runProgram("Maze");
+    runProgram(MAZE_IDX);
 
     return () => {
       document.removeEventListener("keydown", keyDownHandler);
@@ -78,11 +82,11 @@ export default function Chip8() {
   }, []);
 
   const programList: ReactElement[] = [];
-  PROGRAMS.forEach((_, key) => {
-    if (!EXCLUDE_PROGRAMS.includes(key)) {
+  programs.forEach((metadata: ProgramMetadata, idx) => {
+    if (SUPPORTED_PLATFORMS.includes(metadata.platform)) {
       programList.push(
-        <div key={key} onClick={() => runProgram(key)}>
-          {key}
+        <div key={metadata.title} onClick={() => runProgram(idx)}>
+          {metadata.title}
         </div>
       );
     }
@@ -100,13 +104,13 @@ export default function Chip8() {
 
   const _setOnColor = (color: string) => {
     chip8.current!.onColor = color;
-    JSCookie.set(ON_COOKIE, color, expiration);
+    localStorage.setItem(ON_KEY, color);
     setOnColor(color);
   };
 
   const _setOffColor = (color: string) => {
     chip8.current!.offColor = color;
-    JSCookie.set(OFF_COOKIE, color, expiration);
+    localStorage.setItem(OFF_KEY, color);
     setOffColor(color);
   };
 
