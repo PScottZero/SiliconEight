@@ -13,12 +13,18 @@ import {
 import styles from "./chip8.module.css";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 import React from "react";
+import dynamic from "next/dynamic";
 
 const DEFAULT_ON = "#00ffff";
 const DEFAULT_OFF = "#000000";
 
 const ON_KEY = "on";
 const OFF_KEY = "off";
+
+const KEYS = [
+  0x1, 0x2, 0x3, 0xc, 0x4, 0x5, 0x6, 0xd, 0x7, 0x8, 0x9, 0xe, 0xa, 0x0, 0xb,
+  0xf,
+];
 
 const SUPPORTED_PLATFORMS = [
   "originalChip8",
@@ -39,7 +45,7 @@ function getColorCookie(key: string): string {
 export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chip8 = useRef<Chip8Interpreter>();
-  const [description, setDescription] = useState<string>("");
+  const [metadata, setMetadata] = useState<ProgramMetadata>();
   const [onColor, setOnColor] = useState<string>(DEFAULT_ON);
   const [offColor, setOffColor] = useState<string>(DEFAULT_OFF);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
@@ -51,7 +57,7 @@ export default function Chip8() {
     await new Promise((resolve) => setTimeout(resolve, 100));
     chip8.current!.reset(metadata);
     await chip8.current!.run(metadata.path);
-    setDescription(metadata.description);
+    setMetadata(metadata);
   };
 
   useEffect(() => {
@@ -83,10 +89,10 @@ export default function Chip8() {
 
   const programList: ReactElement[] = [];
   programs.forEach((metadata: ProgramMetadata, idx) => {
-    if (SUPPORTED_PLATFORMS.includes(metadata.platform)) {
+    if (SUPPORTED_PLATFORMS.includes(metadata.platformId)) {
       programList.push(
         <div key={metadata.title} onClick={() => runProgram(idx)}>
-          &gt; {metadata.title}
+          {metadata.title}
         </div>
       );
     }
@@ -118,6 +124,30 @@ export default function Chip8() {
     color: onColor,
     backgroundColor: offColor,
   };
+
+  const keyPress = (key: number) => {
+    chip8.current!.keys[key] = true;
+  };
+  const keyRelease = (key: number) => {
+    chip8.current!.keys[key] = false;
+  };
+
+  const keys = [];
+  for (const key of KEYS) {
+    keys.push(
+      <div
+        key={key}
+        className={styles.key}
+        style={dynamicStyle}
+        onPointerDown={() => keyPress(key)}
+        onPointerUp={() => keyRelease(key)}
+        onTouchStart={() => keyPress(key)}
+        onTouchEnd={() => keyRelease(key)}
+      >
+        {key.toString(16).toUpperCase()}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.chip8} style={{ backgroundColor: onColor }}>
@@ -164,8 +194,17 @@ export default function Chip8() {
           height={DISP_HEIGHT * DISP_SCALE}
         ></canvas>
       </div>
+      <div className={styles.info} style={dynamicStyle}>
+        <p>Title: {metadata?.title ?? "Unknown"}</p>
+        <p>Author(s): {metadata?.authors ?? "Unknown"}</p>
+        <p>Release Date: {metadata?.release ?? "Unknown"}</p>
+        <p>Platform: {metadata?.platformName ?? "Unknown"}</p>
+      </div>
       <div className={styles.description} style={dynamicStyle}>
-        {description}
+        {metadata?.description ?? "No description available."}
+      </div>
+      <div className={styles.keypad} style={{ backgroundColor: onColor }}>
+        {keys}
       </div>
     </div>
   );

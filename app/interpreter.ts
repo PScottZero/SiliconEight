@@ -69,7 +69,8 @@ export interface ProgramMetadata {
   authors: string;
   release: string;
   description: string;
-  platform: string;
+  platformId: string;
+  platformName: string;
   tickrate: number;
   logicQuirk: boolean; // 8XY1,8XY2,8XY3: vf = 0 if true else vf unchanged
   shiftQuirk: boolean; // 8XY6+8XYE: shift vx if true else shift vy
@@ -214,13 +215,14 @@ export class Chip8Interpreter {
 
     const now = Date.now();
 
-    const diff = now - timeStamp;
-    const frameOps = diff * OPS_PER_MS;
+    const diffMs = now - timeStamp;
+    const opsPerMs = (this.metadata.tickrate * 60) / MS_PER_SEC;
+    const frameOps = diffMs * opsPerMs;
     for (let i = 0; i < frameOps; i++) this.step();
 
-    const frameDiff = now - frameStamp;
-    if (frameDiff >= MS_PER_FRAME) {
-      frameStamp = now - (frameDiff - MS_PER_FRAME);
+    const frameDiffMs = now - frameStamp;
+    if (frameDiffMs >= MS_PER_FRAME) {
+      frameStamp = now - (frameDiffMs - MS_PER_FRAME);
       this.decrementTimers();
       this.renderFrame();
     }
