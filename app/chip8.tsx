@@ -20,8 +20,6 @@ const DEFAULT_OFF = "#000000";
 const ON_KEY = "on";
 const OFF_KEY = "off";
 
-const MAZE_IDX = 104;
-
 const SUPPORTED_PLATFORMS = [
   "originalChip8",
   "hybridVIP",
@@ -62,7 +60,9 @@ export default function Chip8() {
     setOnColor(onColor);
     setOffColor(offColor);
 
-    const metadata = programs[MAZE_IDX];
+    const { idx, metadata } = programs
+      .map((metadata, idx) => ({ idx: idx, metadata: metadata }))
+      .filter((entry) => entry.metadata.title == "Maze")[0];
     const ctx = canvas.current!.getContext("2d")!;
     chip8.current = new Chip8Interpreter(metadata, ctx, onColor, offColor);
 
@@ -73,7 +73,7 @@ export default function Chip8() {
     document.addEventListener("keydown", keyDownHandler);
     document.addEventListener("keyup", keyUpHandler);
 
-    runProgram(MAZE_IDX);
+    runProgram(idx);
 
     return () => {
       document.removeEventListener("keydown", keyDownHandler);
@@ -86,7 +86,7 @@ export default function Chip8() {
     if (SUPPORTED_PLATFORMS.includes(metadata.platform)) {
       programList.push(
         <div key={metadata.title} onClick={() => runProgram(idx)}>
-          {metadata.title}
+          &gt; {metadata.title}
         </div>
       );
     }

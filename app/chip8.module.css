@@ -9,7 +9,7 @@
     "programList display    "
     "description description";
   grid-template-rows: 3rem 1fr 16rem;
-  grid-template-columns: 22rem 1fr;
+  grid-template-columns: 24rem 1fr;
   gap: var(--gap-size);
   padding: var(--gap-size);
   width: 100vw;

@@ -19,10 +19,11 @@ export const DISP_HEIGHT = 32;
 export const DISP_SCALE = 64;
 
 const MS_PER_SEC = 1000;
-const OPS_PER_SEC = 500;
+const OPS_PER_SEC = 540;
 const OPS_PER_MS = OPS_PER_SEC / MS_PER_SEC;
 const FRAMES_PER_SEC = 60;
 const MS_PER_FRAME = MS_PER_SEC / FRAMES_PER_SEC;
+const OFF_DELAY = 3;
 
 const CHAR_ROWS = 5;
 const CHARS = [
@@ -79,6 +80,35 @@ export interface ProgramMetadata {
   loadStoreQuirkAlt: boolean; // FX55+FX65: i += x if true else i += x + 1
 }
 
+export class Pixel {
+  on: boolean;
+  framesUntilOff: number;
+
+  constructor() {
+    this.on = false;
+    this.framesUntilOff = 0;
+  }
+
+  turnOn() {
+    this.on = true;
+  }
+
+  turnOff(flickerFix: boolean) {
+    if (this.on) {
+      this.on = false;
+      this.framesUntilOff = flickerFix ? OFF_DELAY : 0;
+    }
+  }
+
+  shouldDraw(): boolean {
+    return this.on || this.framesUntilOff > 0;
+  }
+
+  step() {
+    this.framesUntilOff = Math.min(0, this.framesUntilOff - 1);
+  }
+}
+
 export class Chip8Interpreter {
   metadata: ProgramMetadata;
   ctx: CanvasRenderingContext2D;
@@ -88,9 +118,10 @@ export class Chip8Interpreter {
   v: Uint8Array; // 16 8-bit registers
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
-  display: Array<Array<number>>; // 64x32 monochrome display
+  display: Array<Array<Pixel>>; // 64x32 monochrome display
   onColor: string; // pixel on color
   offColor: string; // pixel off color
+  flickerFix: boolean; // should flicker fix be applied
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // stores output register while waiting for key press
   delay: number; // 8-bit delay timer
@@ -117,11 +148,10 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
-    this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0)
-    );
+    this.display = [];
     this.onColor = onColor;
     this.offColor = offColor;
+    this.flickerFix = false;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -133,7 +163,9 @@ export class Chip8Interpreter {
     this.spriteY = 0;
     this.spriteN = 0;
     this.running = true;
+
     this.copyCharData();
+    this.initDisplay();
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -146,7 +178,9 @@ export class Chip8Interpreter {
     requestAnimationFrame(() => this.runLoop(startTime, startTime));
   }
 
-  reset(metadata: ProgramMetadata): boolean {
+  reset(metadata: ProgramMetadata) {
+    if (this.soundPlaying) this.oscillator.stop();
+
     this.metadata = metadata;
 
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
@@ -158,15 +192,13 @@ export class Chip8Interpreter {
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
-    if (this.soundPlaying) this.oscillator.stop();
     this.soundPlaying = false;
     this.oscillator = this.newOscillator();
     this.waitingForVBlank = false;
     this.running = true;
-    this.clearDisplay();
-    this.copyCharData();
 
-    return true;
+    this.copyCharData();
+    this.clearDisplay();
   }
 
   copyCharData() {
@@ -439,15 +471,15 @@ export class Chip8Interpreter {
   async renderFrame() {
     for (let row = 0; row < DISP_HEIGHT; row++) {
       for (let col = 0; col < DISP_WIDTH; col++) {
-        this.ctx.fillStyle = this.display[row][col]
-          ? this.onColor
-          : this.offColor;
+        const px = this.display[row][col];
+        this.ctx.fillStyle = px.shouldDraw() ? this.onColor : this.offColor;
         this.ctx.fillRect(
           col * DISP_SCALE,
           row * DISP_SCALE,
           DISP_SCALE,
           DISP_SCALE
         );
+        px.step();
       }
     }
     if (this.waitingForVBlank) {
@@ -478,17 +510,35 @@ export class Chip8Interpreter {
         if (this.metadata.wrapQuirk) pxX %= DISP_WIDTH;
         if (pxX >= DISP_WIDTH) continue;
         const px = (rowByte >>> (7 - col)) & 1;
-        if (this.display[pxY][pxX] === 1 && px === 1) vf = 1;
-        this.display[pxY][pxX] ^= px;
+        if (px === 1) {
+          if (this.display[pxY][pxX].on) {
+            this.display[pxY][pxX].turnOff(this.flickerFix);
+            vf = 1;
+          } else {
+            this.display[pxY][pxX].turnOn();
+          }
+        }
       }
     }
     this.v[0xf] = vf;
   }
 
+  initDisplay() {
+    for (let y = 0; y < DISP_HEIGHT; y++) {
+      const row: Pixel[] = [];
+      for (let x = 0; x < DISP_WIDTH; x++) {
+        row.push(new Pixel());
+      }
+      this.display.push(row);
+    }
+  }
+
   clearDisplay() {
-    this.display = Array.from({ length: DISP_HEIGHT }, () =>
-      Array<number>(DISP_WIDTH).fill(0)
-    );
+    for (let y = 0; y < DISP_HEIGHT; y++) {
+      for (let x = 0; x < DISP_WIDTH; x++) {
+        this.display[y][x].turnOff(this.flickerFix);
+      }
+    }
   }
 
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -496,6 +546,7 @@ export class Chip8Interpreter {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   keyDownHandler(ev: KeyboardEvent) {
+    if (ev.key === "`") this.flickerFix = !this.flickerFix;
     const key = KEY_MAP.get(ev.key);
     if (key !== undefined) this.keys[key] = true;
   }
