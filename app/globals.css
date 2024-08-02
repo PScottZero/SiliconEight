@@ -1,3 +1,9 @@
+:root {
+  --font-size: 1.5rem;
+  --padding-size: 1rem;
+  --gap-size: 0.25rem;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;

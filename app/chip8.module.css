@@ -1,8 +1,5 @@
 .chip8 {
-  --font-size: 1.5rem;
-  --padding-size: 1rem;
-  --gap-size: 0.25rem;
-
+  position: relative;
   display: grid;
   grid-template-areas:
     "titleBar    titleBar    titleBar"
@@ -30,30 +27,9 @@
 
 .colorPickers {
   float: right;
-  position: relative;
-  margin-top: 0.5rem;
-}
-
-.colorPickerIcon {
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
-  margin-right: 0.5rem;
-}
-
-.colorPickerIcon:hover {
-  border: var(--gap-size) solid white !important;
-}
-
-.colorPicker {
-  position: absolute;
-  top: 2.25rem;
-  transform: translateX(calc(-100% + 4.5rem));
-}
-
-.colorPicker input {
-  width: 100%;
-  font-size: var(--font-size);
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
 .programList {
@@ -111,24 +87,4 @@
   font-weight: bold;
   font-size: var(--font-size);
   overflow-y: auto;
-}
-
-.keypad {
-  grid-area: keypad;
-  display: grid;
-  grid-template-rows: repeat(4, 1fr);
-  grid-template-columns: repeat(4, 1fr);
-  grid-gap: var(--gap-size);
-}
-
-.key {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: var(--font-size);
-  cursor: pointer;
-}
-
-.key:hover {
-  border: var(--gap-size) solid white;
 }

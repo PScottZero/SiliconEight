@@ -19,11 +19,9 @@ export const DISP_HEIGHT = 32;
 export const DISP_SCALE = 64;
 
 const MS_PER_SEC = 1000;
-const OPS_PER_SEC = 540;
-const OPS_PER_MS = OPS_PER_SEC / MS_PER_SEC;
 const FRAMES_PER_SEC = 60;
 const MS_PER_FRAME = MS_PER_SEC / FRAMES_PER_SEC;
-const OFF_DELAY = 3;
+const OFF_DELAY = 5;
 
 const CHAR_ROWS = 5;
 const CHARS = [

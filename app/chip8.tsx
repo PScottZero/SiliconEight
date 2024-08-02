@@ -11,20 +11,15 @@ import {
   ProgramMetadata,
 } from "./interpreter";
 import styles from "./chip8.module.css";
-import { HexColorInput, HexColorPicker } from "react-colorful";
 import React from "react";
-import dynamic from "next/dynamic";
+import Keypad from "./keypad";
+import ColorPicker from "./color-picker";
 
 const DEFAULT_ON = "#00ffff";
 const DEFAULT_OFF = "#000000";
 
 const ON_KEY = "on";
 const OFF_KEY = "off";
-
-const KEYS = [
-  0x1, 0x2, 0x3, 0xc, 0x4, 0x5, 0x6, 0xd, 0x7, 0x8, 0x9, 0xe, 0xa, 0x0, 0xb,
-  0xf,
-];
 
 const SUPPORTED_PLATFORMS = [
   "originalChip8",
@@ -41,6 +36,11 @@ function getColorCookie(key: string): string {
   }
   return localStorage.getItem(key) ?? defaultColor;
 }
+
+export type DynamicStyles = {
+  color: string;
+  backgroundColor: string;
+};
 
 export default function Chip8() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -125,63 +125,29 @@ export default function Chip8() {
     backgroundColor: offColor,
   };
 
-  const keyPress = (key: number) => {
-    chip8.current!.keys[key] = true;
-  };
-  const keyRelease = (key: number) => {
-    chip8.current!.keys[key] = false;
-  };
-
-  const keys = [];
-  for (const key of KEYS) {
-    keys.push(
-      <div
-        key={key}
-        className={styles.key}
-        style={dynamicStyle}
-        onPointerDown={() => keyPress(key)}
-        onPointerUp={() => keyRelease(key)}
-        onTouchStart={() => keyPress(key)}
-        onTouchEnd={() => keyRelease(key)}
-      >
-        {key.toString(16).toUpperCase()}
-      </div>
-    );
-  }
-
   return (
     <div className={styles.chip8} style={{ backgroundColor: onColor }}>
       <div className={styles.titleBar} style={dynamicStyle}>
         <span>CHIP-8 Interpreter</span>
         <div className={styles.colorPickers}>
-          <div
-            className={styles.colorPickerIcon}
-            style={{
-              backgroundColor: onColor,
-              border: `var(--gap-size) solid ${onColor}`,
-            }}
-            onClick={toggleOnPicker}
+          <ColorPicker
+            name="On Color"
+            onPicker={true}
+            onColor={onColor}
+            offColor={offColor}
+            show={showOnPicker}
+            togglePicker={toggleOnPicker}
+            setColor={_setOnColor}
           />
-          <div
-            className={styles.colorPickerIcon}
-            style={{
-              backgroundColor: offColor,
-              border: `var(--gap-size) solid ${onColor}`,
-            }}
-            onClick={toggleOffPicker}
+          <ColorPicker
+            name="Off Color"
+            onPicker={false}
+            onColor={onColor}
+            offColor={offColor}
+            show={showOffPicker}
+            togglePicker={toggleOffPicker}
+            setColor={_setOffColor}
           />
-          {showOnPicker && (
-            <div className={styles.colorPicker}>
-              <HexColorPicker color={onColor} onChange={_setOnColor} />
-              <HexColorInput color={onColor} onChange={_setOnColor} />
-            </div>
-          )}
-          {showOffPicker && (
-            <div className={styles.colorPicker}>
-              <HexColorPicker color={offColor} onChange={_setOffColor} />
-              <HexColorInput color={offColor} onChange={_setOffColor} />
-            </div>
-          )}
         </div>
       </div>
       <div className={styles.programList} style={dynamicStyle}>
@@ -203,9 +169,7 @@ export default function Chip8() {
       <div className={styles.description} style={dynamicStyle}>
         {metadata?.description ?? "No description available."}
       </div>
-      <div className={styles.keypad} style={{ backgroundColor: onColor }}>
-        {keys}
-      </div>
+      <Keypad chip8={chip8.current} onColor={onColor} offColor={offColor} />
     </div>
   );
 }
