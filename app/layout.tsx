@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
+import { Kode_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = IBM_Plex_Mono({
+const kodeMono = Kode_Mono({
   weight: "400",
   subsets: ["latin"],
 });
@@ -22,7 +22,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="favicon.svg" sizes="any" />
       </head>
-      <body className={inter.className} suppressHydrationWarning={true}>
+      <body className={kodeMono.className} suppressHydrationWarning={true}>
         {children}
       </body>
     </html>

@@ -19,7 +19,15 @@
   padding: 1rem 1rem 0.5rem 1rem;
 }
 
+.colorPicker div {
+  border-radius: 0;
+}
+
 .colorPicker input {
   width: 100%;
   font-size: var(--font-size);
+  outline: none;
+  padding-left: 0.3rem;
+  margin-top: 1rem;
+  font-family: inherit;
 }

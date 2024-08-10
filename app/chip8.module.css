@@ -5,8 +5,8 @@
     "titleBar    titleBar    titleBar"
     "programList display     display "
     "info        description keypad  ";
-  grid-template-rows: 3rem 1fr 20rem;
-  grid-template-columns: 24rem 1fr 20rem;
+  grid-template-rows: 3rem 1fr 18rem;
+  grid-template-columns: 24rem 1fr 18rem;
   gap: var(--gap-size);
   padding: var(--gap-size);
   width: 100vw;
@@ -19,7 +19,6 @@
 }
 
 .titleBar span {
-  font-weight: bold;
   font-size: var(--font-size);
   padding-left: var(--padding-size);
   width: auto;
@@ -37,17 +36,19 @@
   font-size: var(--font-size);
   padding: var(--padding-size);
   background: black;
-  font-weight: bold;
   overflow-y: auto;
 }
 
-.programList > div {
-  cursor: pointer;
-  text-indent: -1rem;
-  margin-left: 1rem;
+.programList ul {
+  list-style-type: square;
+  padding-inline-start: 1.2rem;
 }
 
-.programList > div:hover {
+.programList li {
+  cursor: pointer;
+}
+
+.programList li:hover {
   color: white;
 }
 
@@ -71,20 +72,18 @@
 .info {
   grid-area: info;
   padding: var(--padding-size);
-  font-weight: bold;
   font-size: var(--font-size);
   overflow-y: auto;
 }
 
-.info p {
-  text-indent: -1rem;
-  margin-left: 1rem;
+.info ul {
+  list-style-type: square;
+  padding-inline-start: 1.2rem;
 }
 
 .description {
   grid-area: description;
   padding: var(--padding-size);
-  font-weight: bold;
   font-size: var(--font-size);
   overflow-y: auto;
 }

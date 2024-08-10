@@ -1,10 +1,10 @@
 import styles from "./keypad.module.css";
 import { Chip8Interpreter } from "./interpreter";
+import { ColorData } from "./chip8";
 
 type KeypadProps = {
   chip8: Chip8Interpreter | undefined;
-  onColor: string;
-  offColor: string;
+  colorData: ColorData;
 };
 
 const ORDERED_KEYS = [
@@ -20,14 +20,17 @@ const release = (chip8: Chip8Interpreter | undefined, key: number) => {
   if (chip8 !== undefined) chip8!.keys[key] = false;
 };
 
-export default function Keypad({ chip8, onColor, offColor }: KeypadProps) {
+export default function Keypad({ chip8, colorData }: KeypadProps) {
   const keys = [];
   for (const key of ORDERED_KEYS) {
     keys.push(
       <div
         key={key}
         className={styles.key}
-        style={{ color: onColor, backgroundColor: offColor }}
+        style={{
+          color: colorData.onColor,
+          backgroundColor: colorData.offColor,
+        }}
         onPointerDown={() => press(chip8, key)}
         onPointerUp={() => release(chip8, key)}
         onTouchStart={() => press(chip8, key)}
@@ -38,7 +41,10 @@ export default function Keypad({ chip8, onColor, offColor }: KeypadProps) {
     );
   }
   return (
-    <div className={styles.keypad} style={{ backgroundColor: onColor }}>
+    <div
+      className={styles.keypad}
+      style={{ backgroundColor: colorData.onColor }}
+    >
       {keys}
     </div>
   );
