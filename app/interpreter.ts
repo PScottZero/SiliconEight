@@ -14,9 +14,9 @@ const Y_SHIFT = 4;
 const MSB_SHIFT = 7;
 const BYTE_SHIFT = 8;
 
-export const DISP_WIDTH = 64;
-export const DISP_HEIGHT = 32;
-export const DISP_SCALE = 64;
+export const DISPLAY_WIDTH = 64;
+export const DISPLAY_HEIGHT = 32;
+export const DISPLAY_SCALE = 64;
 
 const MS_PER_SEC = 1000;
 const FRAMES_PER_SEC = 60;
@@ -109,8 +109,8 @@ export class Pixel {
 }
 
 export class Chip8Interpreter {
-  metadata: ProgramMetadata;
-  ctx: CanvasRenderingContext2D;
+  metadata: ProgramMetadata | undefined;
+  ctx: CanvasRenderingContext2D | undefined;
 
   mem: Uint8Array; // 4096 bytes of memory
   stack: Array<number>; // 12-bit address stack
@@ -118,29 +118,23 @@ export class Chip8Interpreter {
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
   display: Array<Array<Pixel>>; // 64x32 monochrome display
-  onColor: string; // pixel on color
-  offColor: string; // pixel off color
   flickerFix: boolean; // should flicker fix be applied
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // stores output register while waiting for key press
   delay: number; // 8-bit delay timer
   sound: number; // 8-bit sound timer
   soundPlaying: boolean; // is sound currently playing
-  oscillator: OscillatorNode; // oscillator for playing sound
+  oscillator: OscillatorNode | undefined; // oscillator for playing sound
+  volume: number; // oscillator volume
   waitingForVBlank: boolean; // is the program waiting for v-blank
   spriteX: number; // stores sprite x coord register while waiting for v-blank
   spriteY: number; // stores sprite y coord register while waiting for v-blank
   spriteN: number; // stores the number of sprite rows while waiting for v-blank
   running: boolean; // start + stop interpreter
 
-  constructor(
-    metadata: ProgramMetadata,
-    ctx: CanvasRenderingContext2D,
-    onColor: string,
-    offColor: string
-  ) {
-    this.metadata = metadata;
-    this.ctx = ctx;
+  constructor() {
+    this.metadata = undefined;
+    this.ctx = undefined;
 
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
@@ -148,15 +142,14 @@ export class Chip8Interpreter {
     this.pc = START_ADDR;
     this.i = 0;
     this.display = [];
-    this.onColor = onColor;
-    this.offColor = offColor;
     this.flickerFix = false;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
     this.sound = 0;
     this.soundPlaying = false;
-    this.oscillator = this.newOscillator();
+    this.volume = 5;
+    this.oscillator = undefined;
     this.waitingForVBlank = false;
     this.spriteX = 0;
     this.spriteY = 0;
@@ -178,7 +171,7 @@ export class Chip8Interpreter {
   }
 
   reset(metadata: ProgramMetadata) {
-    if (this.soundPlaying) this.oscillator.stop();
+    if (this.soundPlaying) this.oscillator!.stop();
 
     this.metadata = metadata;
 
@@ -214,7 +207,7 @@ export class Chip8Interpreter {
     const now = Date.now();
 
     const diffMs = now - timeStamp;
-    const opsPerMs = (this.metadata.tickrate * 60) / MS_PER_SEC;
+    const opsPerMs = (this.metadata!.tickrate * 60) / MS_PER_SEC;
     const frameOps = diffMs * opsPerMs;
     for (let i = 0; i < frameOps; i++) this.step();
 
@@ -242,21 +235,21 @@ export class Chip8Interpreter {
   newOscillator(): OscillatorNode {
     const ctx = new AudioContext();
 
-    const volume = ctx.createGain();
-    volume.connect(ctx.destination);
-    volume.gain.value = 0.05;
+    const gainNode = ctx.createGain();
+    gainNode.connect(ctx.destination);
+    gainNode.gain.value = this.volume / 100.0;
 
     const oscillator = ctx.createOscillator();
     oscillator.type = "square";
     oscillator.frequency.value = 493;
-    oscillator.connect(volume);
+    oscillator.connect(gainNode);
 
     return oscillator;
   }
 
   step() {
     if (this.sound == 0 && this.soundPlaying) {
-      this.oscillator.stop();
+      this.oscillator!.stop();
       this.soundPlaying = false;
     }
 
@@ -317,15 +310,15 @@ export class Chip8Interpreter {
             break;
           case 0x1:
             this.v[x] |= this.v[y];
-            if (this.metadata.logicQuirk) this.v[0xf] = 0;
+            if (this.metadata!.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x2:
             this.v[x] &= this.v[y];
-            if (this.metadata.logicQuirk) this.v[0xf] = 0;
+            if (this.metadata!.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x3:
             this.v[x] ^= this.v[y];
-            if (this.metadata.logicQuirk) this.v[0xf] = 0;
+            if (this.metadata!.logicQuirk) this.v[0xf] = 0;
             break;
           case 0x4:
             temp = this.v[x] + this.v[y] > 0xff ? 1 : 0;
@@ -338,7 +331,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0x6:
-            if (!this.metadata.shiftQuirk) this.v[x] = this.v[y];
+            if (!this.metadata!.shiftQuirk) this.v[x] = this.v[y];
             temp = this.v[x] & 1;
             this.v[x] >>>= 1;
             this.v[0xf] = temp;
@@ -349,7 +342,7 @@ export class Chip8Interpreter {
             this.v[0xf] = temp;
             break;
           case 0xe:
-            if (!this.metadata.shiftQuirk) this.v[x] = this.v[y];
+            if (!this.metadata!.shiftQuirk) this.v[x] = this.v[y];
             temp = (this.v[x] >>> MSB_SHIFT) & 1;
             this.v[x] <<= 1;
             this.v[0xf] = temp;
@@ -363,7 +356,7 @@ export class Chip8Interpreter {
         this.i = nnn;
         break;
       case 0xb:
-        this.pc = (this.v[this.metadata.jumpQuirk ? x : 0] + nnn) & NNN_MASK;
+        this.pc = (this.v[this.metadata!.jumpQuirk ? x : 0] + nnn) & NNN_MASK;
         break;
       case 0xc:
         this.v[x] = Math.floor(Math.random() * 256) & nn;
@@ -398,7 +391,7 @@ export class Chip8Interpreter {
           case 0x18:
             this.sound = this.v[x];
             if (this.sound > 0) {
-              if (this.soundPlaying) this.oscillator.stop();
+              if (this.soundPlaying) this.oscillator!.stop();
               this.oscillator = this.newOscillator();
               this.soundPlaying = this.sound > 0;
               this.oscillator.start();
@@ -422,16 +415,16 @@ export class Chip8Interpreter {
             for (let reg = 0; reg <= x; reg++) {
               this.mem[this.i + reg] = this.v[reg];
             }
-            if (!this.metadata.loadStoreQuirk) {
-              this.i += this.metadata.loadStoreQuirkAlt ? x : x + 1;
+            if (!this.metadata!.loadStoreQuirk) {
+              this.i += this.metadata!.loadStoreQuirkAlt ? x : x + 1;
             }
             break;
           case 0x65:
             for (let reg = 0; reg <= x; reg++) {
               this.v[reg] = this.mem[this.i + reg];
             }
-            if (!this.metadata.loadStoreQuirk) {
-              this.i += this.metadata.loadStoreQuirkAlt ? x : x + 1;
+            if (!this.metadata!.loadStoreQuirk) {
+              this.i += this.metadata!.loadStoreQuirkAlt ? x : x + 1;
             }
             break;
           default:
@@ -469,15 +462,19 @@ export class Chip8Interpreter {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   async renderFrame() {
-    for (let row = 0; row < DISP_HEIGHT; row++) {
-      for (let col = 0; col < DISP_WIDTH; col++) {
+    const onColor =
+      document.documentElement.style.getPropertyValue("--on-color");
+    const offColor =
+      document.documentElement.style.getPropertyValue("--off-color");
+    for (let row = 0; row < DISPLAY_HEIGHT; row++) {
+      for (let col = 0; col < DISPLAY_WIDTH; col++) {
         const px = this.display[row][col];
-        this.ctx.fillStyle = px.shouldDraw() ? this.onColor : this.offColor;
-        this.ctx.fillRect(
-          col * DISP_SCALE,
-          row * DISP_SCALE,
-          DISP_SCALE,
-          DISP_SCALE
+        this.ctx!.fillStyle = px.shouldDraw() ? onColor : offColor;
+        this.ctx!.fillRect(
+          col * DISPLAY_SCALE,
+          row * DISPLAY_SCALE,
+          DISPLAY_SCALE,
+          DISPLAY_SCALE,
         );
         px.step();
       }
@@ -489,7 +486,7 @@ export class Chip8Interpreter {
   }
 
   drawSprite(x: number, y: number, n: number) {
-    if (this.metadata.vBlankQuirk && !this.waitingForVBlank) {
+    if (this.metadata!.vBlankQuirk && !this.waitingForVBlank) {
       this.waitingForVBlank = true;
       this.spriteX = x;
       this.spriteY = y;
@@ -498,17 +495,17 @@ export class Chip8Interpreter {
     }
 
     let vf = 0;
-    const xCoord = this.v[x] % DISP_WIDTH;
-    const yCoord = this.v[y] % DISP_HEIGHT;
+    const xCoord = this.v[x] % DISPLAY_WIDTH;
+    const yCoord = this.v[y] % DISPLAY_HEIGHT;
     for (let row = 0; row < n; row++) {
       let pxY = yCoord + row;
-      if (this.metadata.wrapQuirk) pxY %= DISP_HEIGHT;
-      if (pxY >= DISP_HEIGHT) continue;
+      if (this.metadata!.wrapQuirk) pxY %= DISPLAY_HEIGHT;
+      if (pxY >= DISPLAY_HEIGHT) continue;
       let rowByte = this.mem[this.i + row];
       for (let col = 0; col < 8; col++) {
         let pxX = xCoord + col;
-        if (this.metadata.wrapQuirk) pxX %= DISP_WIDTH;
-        if (pxX >= DISP_WIDTH) continue;
+        if (this.metadata!.wrapQuirk) pxX %= DISPLAY_WIDTH;
+        if (pxX >= DISPLAY_WIDTH) continue;
         const px = (rowByte >>> (7 - col)) & 1;
         if (px === 1) {
           if (this.display[pxY][pxX].on) {
@@ -524,9 +521,9 @@ export class Chip8Interpreter {
   }
 
   initDisplay() {
-    for (let y = 0; y < DISP_HEIGHT; y++) {
+    for (let y = 0; y < DISPLAY_HEIGHT; y++) {
       const row: Pixel[] = [];
-      for (let x = 0; x < DISP_WIDTH; x++) {
+      for (let x = 0; x < DISPLAY_WIDTH; x++) {
         row.push(new Pixel());
       }
       this.display.push(row);
@@ -534,8 +531,8 @@ export class Chip8Interpreter {
   }
 
   clearDisplay() {
-    for (let y = 0; y < DISP_HEIGHT; y++) {
-      for (let x = 0; x < DISP_WIDTH; x++) {
+    for (let y = 0; y < DISPLAY_HEIGHT; y++) {
+      for (let x = 0; x < DISPLAY_WIDTH; x++) {
         this.display[y][x].turnOff(this.flickerFix);
       }
     }

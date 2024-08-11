@@ -1,0 +1,56 @@
+.chip8 {
+  position: relative;
+  display: grid;
+  grid-template-areas:
+    "titleBar    titleBar    titleBar"
+    "programList display     display "
+    "info        description keypad  ";
+  grid-template-rows: 3rem 1fr 18rem;
+  grid-template-columns: 24rem 1fr 18rem;
+  gap: var(--gap-size);
+  padding: var(--gap-size);
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--on-color);
+}
+
+.display {
+  grid-area: display;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--padding-size);
+  overflow: hidden;
+  background-color: var(--off-color);
+}
+
+.display canvas {
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 2;
+}
+
+.info {
+  grid-area: info;
+  padding: var(--padding-size);
+  font-size: var(--font-size);
+  overflow-y: auto;
+  color: var(--on-color);
+  background-color: var(--off-color);
+}
+
+.info ul {
+  list-style-type: square;
+  padding-inline-start: 1.2rem;
+}
+
+.description {
+  grid-area: description;
+  padding: var(--padding-size);
+  font-size: var(--font-size);
+  overflow-y: auto;
+  color: var(--on-color);
+  background-color: var(--off-color);
+}

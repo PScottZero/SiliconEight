@@ -13,6 +13,8 @@
   font-size: var(--font-size);
   cursor: pointer;
   user-select: none;
+  color: var(--on-color);
+  background-color: var(--off-color);
 }
 
 .key:hover {
