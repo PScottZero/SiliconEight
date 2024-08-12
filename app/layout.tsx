@@ -9,7 +9,7 @@ const kodeMono = Kode_Mono({
 
 export const metadata: Metadata = {
   title: "CHIP-8 Interpreter",
-  description: "CHIP-8 interpreter written using next.js",
+  description: "Next.js CHIP-8 interpreter",
 };
 
 export default function RootLayout({

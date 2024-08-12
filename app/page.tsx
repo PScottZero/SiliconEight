@@ -3,22 +3,17 @@
 import programs from "../public/programs.json";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Chip8Interpreter,
-  DISPLAY_HEIGHT,
-  DISPLAY_SCALE,
-  DISPLAY_WIDTH,
-  ProgramMetadata,
-} from "./interpreter";
+import { Chip8Interpreter, ProgramMetadata } from "./interpreter";
 import styles from "./page.module.css";
 import React from "react";
 import Keypad from "./components/keypad/keypad";
 import TitleBar from "./components/title-bar/title-bar";
 import ProgramList from "./components/program-list/program-list";
+import Display from "./components/display/display";
+import Info from "./components/info/info";
+import Description from "./components/description/description";
 
 const DEFAULT_PROGRAM = "1D Cellular Automata";
-const DEFAULT_DESCRIPTION = "No description available.";
-const UNKNOWN = "Unknown";
 
 function getDefaultProgram(): [number, ProgramMetadata] {
   const { idx, metadata } = programs
@@ -64,24 +59,9 @@ export default function Chip8() {
     <main className={styles.chip8}>
       <TitleBar chip8={chip8.current} />
       <ProgramList runProgram={runProgram} />
-      <div className={styles.display}>
-        <canvas
-          ref={canvas}
-          width={DISPLAY_WIDTH * DISPLAY_SCALE}
-          height={DISPLAY_HEIGHT * DISPLAY_SCALE}
-        ></canvas>
-      </div>
-      <div className={styles.info}>
-        <ul>
-          <li>Title: {metadata?.title ?? UNKNOWN}</li>
-          <li>Author(s): {metadata?.authors ?? UNKNOWN}</li>
-          <li>Release Date: {metadata?.release ?? UNKNOWN}</li>
-          <li>Platform: {metadata?.platformName ?? UNKNOWN}</li>
-        </ul>
-      </div>
-      <div className={styles.description}>
-        {metadata?.description ?? DEFAULT_DESCRIPTION}
-      </div>
+      <Display canvas={canvas} />
+      <Info metadata={metadata} />
+      <Description metadata={metadata} />
       <Keypad chip8={chip8.current} />
     </main>
   );

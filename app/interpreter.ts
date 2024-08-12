@@ -462,10 +462,9 @@ export class Chip8Interpreter {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   async renderFrame() {
-    const onColor =
-      document.documentElement.style.getPropertyValue("--on-color");
-    const offColor =
-      document.documentElement.style.getPropertyValue("--off-color");
+    const documentStyle = document.documentElement.style;
+    const onColor = documentStyle.getPropertyValue("--on-color");
+    const offColor = documentStyle.getPropertyValue("--off-color");
     for (let row = 0; row < DISPLAY_HEIGHT; row++) {
       for (let col = 0; col < DISPLAY_WIDTH; col++) {
         const px = this.display[row][col];

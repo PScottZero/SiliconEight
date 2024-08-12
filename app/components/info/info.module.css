@@ -1,0 +1,13 @@
+.info {
+  grid-area: info;
+  padding: var(--padding-size);
+  font-size: var(--font-size);
+  overflow-y: auto;
+  color: var(--on-color);
+  background-color: var(--off-color);
+}
+
+.info ul {
+  list-style-type: square;
+  padding-inline-start: 1.2rem;
+}

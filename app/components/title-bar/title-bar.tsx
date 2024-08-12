@@ -1,33 +1,30 @@
 import { HexColorInput, HexColorPicker } from "react-colorful";
 import styles from "./title-bar.module.css";
 import { Chip8Interpreter } from "@/app/interpreter";
-import { useEffect, useState } from "react";
+import { SetStateAction, useEffect, useState } from "react";
+import {
+  DEFAULT_OFF,
+  DEFAULT_ON,
+  DEFAULT_VOLUME,
+  getColorStorage,
+  getVolumeStorage,
+  setColorStorage,
+  setVolumeStorage,
+} from "@/app/local-storage";
 
 type TitleBarProps = {
   chip8: Chip8Interpreter;
 };
 
-export const ON_KEY = "on";
-export const OFF_KEY = "off";
-export const VOLUME_KEY = "volume";
-
-const DEFAULT_ON = "#00ffc0";
-const DEFAULT_OFF = "#041640";
-const DEFAULT_VOLUME = "5";
-
-function getColorStorage(key: string): string {
-  const defaultColor = key === ON_KEY ? DEFAULT_ON : DEFAULT_OFF;
-  if (localStorage.getItem(key) === undefined) {
-    localStorage.setItem(key, defaultColor);
-  }
-  return localStorage.getItem(key) ?? defaultColor;
-}
-
-function getVolumeStorage(): number {
-  if (localStorage.getItem(VOLUME_KEY) === undefined) {
-    localStorage.setItem(VOLUME_KEY, DEFAULT_VOLUME);
-  }
-  return parseInt(localStorage.getItem(VOLUME_KEY) ?? DEFAULT_VOLUME);
+function setColor(
+  on: boolean,
+  color: string,
+  setState: (value: SetStateAction<string>) => void,
+) {
+  const cssVar = on ? "--on-color" : "--off-color";
+  document.documentElement.style.setProperty(cssVar, color);
+  setColorStorage(on, color);
+  setState(color);
 }
 
 export default function TitleBar({ chip8 }: TitleBarProps) {
@@ -35,26 +32,15 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
   const [offColor, setOffColor] = useState<string>(DEFAULT_OFF);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(parseInt(DEFAULT_VOLUME));
+  const [volume, setVolume] = useState<number>(DEFAULT_VOLUME);
 
-  const _setOnColor = (color: string) => {
-    document.documentElement.style.setProperty("--on-color", color);
-    localStorage.setItem(ON_KEY, color);
-    setOnColor(color);
-  };
-
-  const _setOffColor = (color: string) => {
-    document.documentElement.style.setProperty("--off-color", color);
-    localStorage.setItem(OFF_KEY, color);
-    setOffColor(color);
-  };
-
+  const _setOnColor = (color: string) => setColor(true, color, setOnColor);
+  const _setOffColor = (color: string) => setColor(false, color, setOffColor);
   const _setVolume = (volume: number) => {
     chip8.volume = volume;
-    localStorage.setItem(VOLUME_KEY, volume.toString());
+    setVolumeStorage(volume);
     setVolume(volume);
   };
-
   const toggleOnPicker = () => {
     setShowOnPicker(!showOnPicker);
     setShowOffPicker(false);
@@ -65,21 +51,15 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
   };
 
   useEffect(() => {
-    const _onColor = getColorStorage(ON_KEY);
-    const _offColor = getColorStorage(OFF_KEY);
-    const _volume = getVolumeStorage();
-
-    document.documentElement.style.setProperty("--on-color", _onColor);
-    document.documentElement.style.setProperty("--off-color", _offColor);
-    chip8.volume = _volume;
-
-    setOnColor(_onColor);
-    setOffColor(_offColor);
-    setVolume(_volume);
+    _setOnColor(getColorStorage(true));
+    _setOffColor(getColorStorage(false));
+    _setVolume(getVolumeStorage());
   }, []);
 
-  const onBorder = `var(--gap-size) solid ${showOnPicker ? "white" : "var(--on-color)"}`;
-  const offBorder = `var(--gap-size) solid  ${showOffPicker ? "white" : "var(--on-color)"}`;
+  const onBorderColor = showOnPicker ? "white" : "var(--on-color)";
+  const offBorderColor = showOffPicker ? "white" : "var(--on-color)";
+  const onBorder = `var(--gap-size) solid ${onBorderColor}`;
+  const offBorder = `var(--gap-size) solid  ${offBorderColor}`;
 
   return (
     <div className={styles.titleBar}>

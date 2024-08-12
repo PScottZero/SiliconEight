@@ -1,0 +1,8 @@
+.description {
+  grid-area: description;
+  padding: var(--padding-size);
+  font-size: var(--font-size);
+  overflow-y: auto;
+  color: var(--on-color);
+  background-color: var(--off-color);
+}
