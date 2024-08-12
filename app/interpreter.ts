@@ -14,9 +14,11 @@ const Y_SHIFT = 4;
 const MSB_SHIFT = 7;
 const BYTE_SHIFT = 8;
 
-export const DISPLAY_WIDTH = 64;
-export const DISPLAY_HEIGHT = 32;
-export const DISPLAY_SCALE = 64;
+export const LORES_WIDTH = 64;
+export const LORES_HEIGHT = 32;
+export const HIRES_WIDTH = 128;
+export const HIRES_HEIGHT = 64;
+export const DISPLAY_SCALE = 32;
 
 const MS_PER_SEC = 1000;
 const FRAMES_PER_SEC = 60;
@@ -118,6 +120,7 @@ export class Chip8Interpreter {
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
   display: Array<Array<Pixel>>; // 64x32 monochrome display
+  hires: boolean; // should hires mode be used
   flickerFix: boolean; // should flicker fix be applied
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // stores output register while waiting for key press
@@ -142,6 +145,7 @@ export class Chip8Interpreter {
     this.pc = START_ADDR;
     this.i = 0;
     this.display = [];
+    this.hires = false;
     this.flickerFix = false;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
@@ -180,6 +184,7 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
+    this.hires = false;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -275,6 +280,21 @@ export class Chip8Interpreter {
             break;
           case 0x0ee:
             this.pc = this.stack.pop() ?? START_ADDR;
+            break;
+          case 0x0fb:
+            this.scrollDisplayRight();
+            break;
+          case 0x0fc:
+            this.scrollDisplayLeft();
+            break;
+          case 0x0fd:
+            this.running = false;
+            break;
+          case 0x0fe:
+            this.hires = false;
+            break;
+          case 0x0ff:
+            this.hires = true;
             break;
           default:
             this.invalidOpcode(opcode);
@@ -465,15 +485,15 @@ export class Chip8Interpreter {
     const documentStyle = document.documentElement.style;
     const onColor = documentStyle.getPropertyValue("--on-color");
     const offColor = documentStyle.getPropertyValue("--off-color");
-    for (let row = 0; row < DISPLAY_HEIGHT; row++) {
-      for (let col = 0; col < DISPLAY_WIDTH; col++) {
+    for (let row = 0; row < HIRES_HEIGHT; row++) {
+      for (let col = 0; col < HIRES_WIDTH; col++) {
         const px = this.display[row][col];
         this.ctx!.fillStyle = px.shouldDraw() ? onColor : offColor;
         this.ctx!.fillRect(
           col * DISPLAY_SCALE,
           row * DISPLAY_SCALE,
           DISPLAY_SCALE,
-          DISPLAY_SCALE,
+          DISPLAY_SCALE
         );
         px.step();
       }
@@ -492,37 +512,73 @@ export class Chip8Interpreter {
       this.spriteN = n;
       return;
     }
+    n === 0 ? this.drawHiresSprite(x, y) : this.drawLoresSprite(x, y, n);
+  }
 
-    let vf = 0;
-    const xCoord = this.v[x] % DISPLAY_WIDTH;
-    const yCoord = this.v[y] % DISPLAY_HEIGHT;
+  drawLoresSprite(x: number, y: number, n: number) {
+    const width = this.hires ? HIRES_WIDTH : LORES_WIDTH;
+    const height = this.hires ? HIRES_HEIGHT : LORES_HEIGHT;
+
+    const xCoord = this.v[x] % width;
+    const yCoord = this.v[y] % height;
+
+    this.v[0xf] = 0;
     for (let row = 0; row < n; row++) {
       let pxY = yCoord + row;
-      if (this.metadata!.wrapQuirk) pxY %= DISPLAY_HEIGHT;
-      if (pxY >= DISPLAY_HEIGHT) continue;
+      if (this.metadata!.wrapQuirk) pxY %= height;
+      if (pxY >= height) continue;
       let rowByte = this.mem[this.i + row];
       for (let col = 0; col < 8; col++) {
         let pxX = xCoord + col;
-        if (this.metadata!.wrapQuirk) pxX %= DISPLAY_WIDTH;
-        if (pxX >= DISPLAY_WIDTH) continue;
+        if (this.metadata!.wrapQuirk) pxX %= width;
+        if (pxX >= width) continue;
         const px = (rowByte >>> (7 - col)) & 1;
-        if (px === 1) {
-          if (this.display[pxY][pxX].on) {
-            this.display[pxY][pxX].turnOff(this.flickerFix);
-            vf = 1;
-          } else {
-            this.display[pxY][pxX].turnOn();
-          }
-        }
+        if (px === 1) this.setPixel(pxX, pxY);
       }
     }
-    this.v[0xf] = vf;
+  }
+
+  drawHiresSprite(x: number, y: number) {
+    // TODO
+  }
+
+  setPixel(x: number, y: number) {
+    [x, y] = this.hires ? [x, y] : [x * 2, y * 2];
+    const coords = this.hires
+      ? [[x, y]]
+      : [
+          [x, y],
+          [x + 1, y],
+          [x, y + 1],
+          [x + 1, y + 1],
+        ];
+    for (const coord of coords) {
+      const px = this.display[coord[1]][coord[0]];
+      if (px.on) {
+        this.v[0xf] = 1;
+        px.turnOff(this.flickerFix);
+      } else {
+        px.turnOn();
+      }
+    }
+  }
+
+  scrollDisplayRight() {
+    // TODO
+  }
+
+  scrollDisplayLeft() {
+    // TODO
+  }
+
+  scrollDisplayDown() {
+    // TODO
   }
 
   initDisplay() {
-    for (let y = 0; y < DISPLAY_HEIGHT; y++) {
+    for (let y = 0; y < HIRES_HEIGHT; y++) {
       const row: Pixel[] = [];
-      for (let x = 0; x < DISPLAY_WIDTH; x++) {
+      for (let x = 0; x < HIRES_WIDTH; x++) {
         row.push(new Pixel());
       }
       this.display.push(row);
@@ -530,8 +586,8 @@ export class Chip8Interpreter {
   }
 
   clearDisplay() {
-    for (let y = 0; y < DISPLAY_HEIGHT; y++) {
-      for (let x = 0; x < DISPLAY_WIDTH; x++) {
+    for (let y = 0; y < HIRES_HEIGHT; y++) {
+      for (let x = 0; x < HIRES_WIDTH; x++) {
         this.display[y][x].turnOff(this.flickerFix);
       }
     }
