@@ -1,8 +1,9 @@
-const OFF_DELAY = 5;
-const FADE_DELAY = 60;
+const OFF_DELAY = 2;
+const FADE_DELAY = 10;
 export const PX_SCALE = 32;
 const SCANLINE_HEIGHT = 6;
 const SCANLINE_COLOR = "#111";
+const SCANLINES_PER_PX = 2;
 
 export enum Filter {
   None = "No Filter",
@@ -49,6 +50,7 @@ export class Pixel {
 
   turnOn() {
     this.on = true;
+    this.framesUntilOff = 0;
   }
 
   turnOff(filter: Filter) {
@@ -83,20 +85,16 @@ export class Pixel {
     ctx.fillRect(x, y, PX_SCALE, PX_SCALE);
     if (CRT_FILTERS.includes(filter)) {
       ctx.fillStyle = filter === Filter.CRT1 ? SCANLINE_COLOR : offColor;
-      ctx.fillRect(
-        x,
-        y + PX_SCALE - SCANLINE_HEIGHT,
-        PX_SCALE,
-        SCANLINE_HEIGHT
-      );
-      ctx.fillRect(
-        x,
-        y + PX_SCALE / 2 - SCANLINE_HEIGHT,
-        PX_SCALE,
-        SCANLINE_HEIGHT
-      );
+      for (let i = 0; i < SCANLINES_PER_PX; i++) {
+        ctx.fillRect(
+          x,
+          y + (PX_SCALE / SCANLINES_PER_PX) * (i + 1) - SCANLINE_HEIGHT,
+          PX_SCALE,
+          SCANLINE_HEIGHT
+        );
+      }
     }
 
-    this.framesUntilOff = Math.min(0, this.framesUntilOff - 1);
+    this.framesUntilOff = Math.max(0, this.framesUntilOff - 1);
   }
 }

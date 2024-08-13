@@ -10,6 +10,7 @@
   gap: var(--gap-size);
   padding: var(--gap-size);
   width: 100vw;
+  min-width: 70.95rem;
   height: 100vh;
   background-color: var(--on-color);
 }
