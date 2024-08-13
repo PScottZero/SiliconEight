@@ -2,7 +2,7 @@ const OFF_DELAY = 2;
 const FADE_DELAY = 8;
 export const PX_SCALE = 32;
 const SCANLINE_HEIGHT = 6;
-const SCANLINE_COLOR = "#111";
+const SCANLINE_COLOR = "#00000060";
 const SCANLINES_PER_PX = 2;
 
 export enum Filter {
@@ -88,7 +88,7 @@ export class Pixel {
       for (let i = 0; i < SCANLINES_PER_PX; i++) {
         ctx.fillRect(
           x,
-          y + (PX_SCALE / SCANLINES_PER_PX) * (i + 1) - SCANLINE_HEIGHT,
+          y + (PX_SCALE / SCANLINES_PER_PX) * i,
           PX_SCALE,
           SCANLINE_HEIGHT
         );
