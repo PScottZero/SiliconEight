@@ -1,3 +1,5 @@
+import { Filter, Pixel } from "./pixel";
+
 const MEM_SIZE = 0x1000;
 const START_ADDR = 0x200;
 const REG_COUNT = 16;
@@ -18,12 +20,13 @@ export const LORES_WIDTH = 64;
 export const LORES_HEIGHT = 32;
 export const HIRES_WIDTH = 128;
 export const HIRES_HEIGHT = 64;
-export const DISPLAY_SCALE = 32;
 
 const MS_PER_SEC = 1000;
 const FRAMES_PER_SEC = 60;
 const MS_PER_FRAME = MS_PER_SEC / FRAMES_PER_SEC;
-const OFF_DELAY = 5;
+
+const VOLUME_STEPS = 10;
+const MAX_VOLUME = 0.25;
 
 const CHAR_ROWS = 5;
 const CHARS = [
@@ -81,35 +84,6 @@ export interface ProgramMetadata {
   loadStoreQuirkAlt: boolean; // FX55+FX65: i += x if true else i += x + 1
 }
 
-export class Pixel {
-  on: boolean;
-  framesUntilOff: number;
-
-  constructor() {
-    this.on = false;
-    this.framesUntilOff = 0;
-  }
-
-  turnOn() {
-    this.on = true;
-  }
-
-  turnOff(flickerFix: boolean) {
-    if (this.on) {
-      this.on = false;
-      this.framesUntilOff = flickerFix ? OFF_DELAY : 0;
-    }
-  }
-
-  shouldDraw(): boolean {
-    return this.on || this.framesUntilOff > 0;
-  }
-
-  step() {
-    this.framesUntilOff = Math.min(0, this.framesUntilOff - 1);
-  }
-}
-
 export class Chip8Interpreter {
   metadata: ProgramMetadata | undefined;
   ctx: CanvasRenderingContext2D | undefined;
@@ -120,8 +94,8 @@ export class Chip8Interpreter {
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
   display: Array<Array<Pixel>>; // 64x32 monochrome display
+  filter: Filter;
   hires: boolean; // should hires mode be used
-  flickerFix: boolean; // should flicker fix be applied
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // stores output register while waiting for key press
   delay: number; // 8-bit delay timer
@@ -146,7 +120,7 @@ export class Chip8Interpreter {
     this.i = 0;
     this.display = [];
     this.hires = false;
-    this.flickerFix = false;
+    this.filter = Filter.None;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -242,7 +216,7 @@ export class Chip8Interpreter {
 
     const gainNode = ctx.createGain();
     gainNode.connect(ctx.destination);
-    gainNode.gain.value = this.volume / 100.0;
+    gainNode.gain.value = (this.volume / VOLUME_STEPS) * MAX_VOLUME;
 
     const oscillator = ctx.createOscillator();
     oscillator.type = "square";
@@ -485,17 +459,16 @@ export class Chip8Interpreter {
     const documentStyle = document.documentElement.style;
     const onColor = documentStyle.getPropertyValue("--on-color");
     const offColor = documentStyle.getPropertyValue("--off-color");
-    for (let row = 0; row < HIRES_HEIGHT; row++) {
-      for (let col = 0; col < HIRES_WIDTH; col++) {
-        const px = this.display[row][col];
-        this.ctx!.fillStyle = px.shouldDraw() ? onColor : offColor;
-        this.ctx!.fillRect(
-          col * DISPLAY_SCALE,
-          row * DISPLAY_SCALE,
-          DISPLAY_SCALE,
-          DISPLAY_SCALE
+    for (let y = 0; y < HIRES_HEIGHT; y++) {
+      for (let x = 0; x < HIRES_WIDTH; x++) {
+        this.display[y][x].draw(
+          x,
+          y,
+          onColor,
+          offColor,
+          this.filter,
+          this.ctx!
         );
-        px.step();
       }
     }
     if (this.waitingForVBlank) {
@@ -556,7 +529,7 @@ export class Chip8Interpreter {
       const px = this.display[coord[1]][coord[0]];
       if (px.on) {
         this.v[0xf] = 1;
-        px.turnOff(this.flickerFix);
+        px.turnOff(this.filter);
       } else {
         px.turnOn();
       }
@@ -588,7 +561,7 @@ export class Chip8Interpreter {
   clearDisplay() {
     for (let y = 0; y < HIRES_HEIGHT; y++) {
       for (let x = 0; x < HIRES_WIDTH; x++) {
-        this.display[y][x].turnOff(this.flickerFix);
+        this.display[y][x].turnOff(this.filter);
       }
     }
   }
@@ -598,7 +571,6 @@ export class Chip8Interpreter {
   // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
   keyDownHandler(ev: KeyboardEvent) {
-    if (ev.key === "`") this.flickerFix = !this.flickerFix;
     const key = KEY_MAP.get(ev.key);
     if (key !== undefined) this.keys[key] = true;
   }

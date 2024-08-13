@@ -1,5 +1,4 @@
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import styles from "./title-bar.module.css";
 import { Chip8Interpreter } from "@/app/interpreter";
 import { SetStateAction, useEffect, useState } from "react";
 import {
@@ -7,19 +6,28 @@ import {
   DEFAULT_ON,
   DEFAULT_VOLUME,
   getColorStorage,
+  getFilterStorage,
   getVolumeStorage,
   setColorStorage,
+  setFilterStorage,
   setVolumeStorage,
 } from "@/app/local-storage";
+import Button from "../button/button";
+import { Filter } from "@/app/pixel";
+import styles from "./title-bar.module.css";
 
-type TitleBarProps = {
-  chip8: Chip8Interpreter;
-};
+const FILTER_ORDER = [
+  Filter.None,
+  Filter.FixFlicker,
+  Filter.Fade,
+  Filter.CRT1,
+  Filter.CRT2,
+];
 
 function setColor(
   on: boolean,
   color: string,
-  setState: (value: SetStateAction<string>) => void,
+  setState: (value: SetStateAction<string>) => void
 ) {
   const cssVar = on ? "--on-color" : "--off-color";
   document.documentElement.style.setProperty(cssVar, color);
@@ -27,12 +35,22 @@ function setColor(
   setState(color);
 }
 
+type TitleBarProps = {
+  chip8: Chip8Interpreter;
+};
+
 export default function TitleBar({ chip8 }: TitleBarProps) {
   const [onColor, setOnColor] = useState<string>(DEFAULT_ON);
   const [offColor, setOffColor] = useState<string>(DEFAULT_OFF);
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
   const [volume, setVolume] = useState<number>(DEFAULT_VOLUME);
+  const [filter, setFilter] = useState<Filter>(Filter.None);
+
+  const hidePickers = () => {
+    setShowOnPicker(false);
+    setShowOffPicker(false);
+  };
 
   const _setOnColor = (color: string) => setColor(true, color, setOnColor);
   const _setOffColor = (color: string) => setColor(false, color, setOffColor);
@@ -40,13 +58,28 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
     chip8.volume = volume;
     setVolumeStorage(volume);
     setVolume(volume);
+    hidePickers();
   };
+  const _setFilter = (filter: Filter) => {
+    chip8.filter = filter;
+    setFilterStorage(filter);
+    setFilter(filter);
+    hidePickers();
+  };
+
+  const toggleFilter = () => {
+    _setFilter(
+      FILTER_ORDER[(FILTER_ORDER.indexOf(filter) + 1) % FILTER_ORDER.length]
+    );
+  };
+
   const toggleOnPicker = () => {
+    hidePickers();
     setShowOnPicker(!showOnPicker);
-    setShowOffPicker(false);
   };
+
   const toggleOffPicker = () => {
-    setShowOnPicker(false);
+    hidePickers();
     setShowOffPicker(!showOffPicker);
   };
 
@@ -54,35 +87,44 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
     _setOnColor(getColorStorage(true));
     _setOffColor(getColorStorage(false));
     _setVolume(getVolumeStorage());
+    _setFilter(getFilterStorage());
   }, []);
 
   const onBorderColor = showOnPicker ? "white" : "var(--on-color)";
   const offBorderColor = showOffPicker ? "white" : "var(--on-color)";
-  const onBorder = `var(--gap-size) solid ${onBorderColor}`;
-  const offBorder = `var(--gap-size) solid  ${offBorderColor}`;
 
   return (
     <div className={styles.titleBar}>
       <span className={styles.title}>CHIP-8 Interpreter</span>
-      <span className={styles.volumeSlider}>
-        Volume
-        <input
-          type="range"
-          min={0}
-          max={100}
-          defaultValue={volume}
-          onChange={(e) => _setVolume(parseInt(e.target.value))}
+      <div className={styles.settings}>
+        <div className={styles.separator} />
+        <span className={styles.volumeSlider}>
+          Volume
+          <input
+            type="range"
+            min={0}
+            max={10}
+            defaultValue={volume}
+            onChange={(e) => _setVolume(parseInt(e.target.value))}
+          />
+          {`${volume.toString().padStart(2, "0")}`}
+        </span>
+        <div className={styles.separator} />
+        <Button
+          text={filter}
+          textColor={onColor}
+          backgroundColor={offColor}
+          borderColor={onColor}
+          onClick={toggleFilter}
         />
-        {`${volume.toString().padStart(3, "0")}%`}
-      </span>
-      <div className={styles.colorPickers}>
-        <div
-          className={styles.colorPickerIcon}
-          style={{ backgroundColor: onColor, border: onBorder }}
+        <div className={styles.separator} />
+        <Button
+          text="On Color"
+          textColor={offColor}
+          backgroundColor={onColor}
+          borderColor={onBorderColor}
           onClick={toggleOnPicker}
-        >
-          <div style={{ color: offColor }}>On Color</div>
-        </div>
+        />
         {showOnPicker && (
           <div className={styles.colorPicker}>
             <HexColorPicker
@@ -93,13 +135,13 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
             <HexColorInput color={onColor} onChange={_setOnColor} />
           </div>
         )}
-        <div
-          className={styles.colorPickerIcon}
-          style={{ backgroundColor: offColor, border: offBorder }}
+        <Button
+          text="Off Color"
+          textColor={onColor}
+          backgroundColor={offColor}
+          borderColor={offBorderColor}
           onClick={toggleOffPicker}
-        >
-          <div style={{ color: onColor }}>Off Color</div>
-        </div>
+        />
         {showOffPicker && (
           <div className={styles.colorPicker}>
             <HexColorPicker

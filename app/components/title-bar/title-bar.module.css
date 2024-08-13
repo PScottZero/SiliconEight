@@ -1,7 +1,7 @@
 .titleBar {
   grid-area: titleBar;
   display: grid;
-  grid-template-areas: "title volume pickers";
+  grid-template-areas: "title volume settings";
   grid-template-columns: auto 1fr auto;
   line-height: 3rem;
   color: var(--on-color);
@@ -18,11 +18,12 @@
   grid-area: volume;
   display: inline-block;
   font-size: var(--font-size);
-  text-align: center;
+  text-align: right;
+  margin-right: 0.5rem;
 }
 
 .volumeSlider input {
-  margin: 0 1rem;
+  margin: 0 0.5rem;
   background-color: transparent;
 }
 
@@ -42,29 +43,12 @@
   height: var(--gap-size);
 }
 
-.colorPickers {
-  grid-area: pickers;
+.settings {
+  grid-area: settings;
   float: right;
   display: flex;
   align-items: center;
   height: 100%;
-}
-
-.colorPickerIcon {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 2rem;
-  width: 8rem;
-  margin-right: 0.5rem;
-  padding: 0 0.5rem;
-  cursor: pointer;
-  border: var(--gap-size) solid var(--on-color);
-  user-select: none;
-}
-
-.colorPickerIcon:hover {
-  border: var(--gap-size) solid white !important;
 }
 
 .colorPicker {
@@ -95,4 +79,11 @@
   color: var(--on-color);
   background-color: var(--off-color);
   border: var(--gap-size) solid var(--on-color);
+}
+
+.separator {
+  width: var(--gap-size);
+  height: 100%;
+  background-color: var(--on-color);
+  margin-right: 0.5rem;
 }

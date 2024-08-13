@@ -1,5 +1,6 @@
-import { DISPLAY_SCALE, HIRES_WIDTH, HIRES_HEIGHT } from "@/app/interpreter";
+import { HIRES_WIDTH, HIRES_HEIGHT } from "@/app/interpreter";
 import styles from "./display.module.css";
+import { PX_SCALE } from "@/app/pixel";
 
 export default function Display({
   canvas,
@@ -10,8 +11,8 @@ export default function Display({
     <div className={styles.display}>
       <canvas
         ref={canvas}
-        width={HIRES_WIDTH * DISPLAY_SCALE}
-        height={HIRES_HEIGHT * DISPLAY_SCALE}
+        width={HIRES_WIDTH * PX_SCALE}
+        height={HIRES_HEIGHT * PX_SCALE}
       ></canvas>
     </div>
   );
