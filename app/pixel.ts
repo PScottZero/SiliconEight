@@ -1,5 +1,5 @@
 const OFF_DELAY = 2;
-const FADE_DELAY = 10;
+const FADE_DELAY = 8;
 export const PX_SCALE = 32;
 const SCANLINE_HEIGHT = 6;
 const SCANLINE_COLOR = "#111";
