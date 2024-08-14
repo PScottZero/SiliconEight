@@ -4,13 +4,7 @@ import programs from "../../../public/programs.json";
 import { ReactElement } from "react";
 import styles from "./program-list.module.css";
 
-const SUPPORTED_PLATFORMS = [
-  "originalChip8",
-  "hybridVIP",
-  "modernChip8",
-  "chip8x",
-  "chip48",
-];
+const PLATFORM_EXCLUSIONS = ["megachip8", "xochip", "superchip1"];
 
 type ProgramListProps = {
   runProgram: (idx: number) => void;
@@ -19,11 +13,12 @@ type ProgramListProps = {
 export default function ProgramList({ runProgram }: ProgramListProps) {
   const programList: ReactElement[] = [];
   programs.forEach((metadata: ProgramMetadata, idx) => {
-    if (SUPPORTED_PLATFORMS.includes(metadata.platformId)) {
+    if (!PLATFORM_EXCLUSIONS.includes(metadata.platformId)) {
       programList.push(
         <li key={metadata.title} onClick={() => runProgram(idx)}>
+          {metadata.platformId === "superchip" ? "⚠" : ""}
           {metadata.title}
-        </li>,
+        </li>
       );
     }
   });

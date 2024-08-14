@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VOLUME,
+  getFlagRegister,
+  setFlagRegister,
+} from "./local-storage";
 import { Filter, Pixel } from "./pixel";
 
 const MEM_SIZE = 0x1000;
@@ -20,6 +25,8 @@ export const LORES_WIDTH = 64;
 export const LORES_HEIGHT = 32;
 export const HIRES_WIDTH = 128;
 export const HIRES_HEIGHT = 64;
+const HIRES_SPRITE_SIZE = 16;
+const BYTE_SIZE = 8;
 
 const MS_PER_SEC = 1000;
 const FRAMES_PER_SEC = 60;
@@ -28,8 +35,8 @@ const MS_PER_FRAME = MS_PER_SEC / FRAMES_PER_SEC;
 const VOLUME_STEPS = 10;
 const MAX_VOLUME = 0.25;
 
-const CHAR_ROWS = 5;
-const CHARS = [
+const LORES_ROWS = 5;
+const LORES_FONT = [
   [0xf0, 0x90, 0x90, 0x90, 0xf0], // 0
   [0x20, 0x60, 0x20, 0x20, 0x70], // 1
   [0xf0, 0x10, 0xf0, 0x80, 0xf0], // 2
@@ -46,6 +53,27 @@ const CHARS = [
   [0xe0, 0x90, 0x90, 0x90, 0xe0], // D
   [0xf0, 0x80, 0xf0, 0x80, 0xf0], // E
   [0xf0, 0x80, 0xf0, 0x80, 0x80], // F
+];
+
+const HIRES_ROWS = 10;
+const HIRES_FONT_ADDR = 0x50;
+const HIRES_FONT = [
+  [0xff, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xff], // 0
+  [0x0c, 0x0c, 0x3c, 0x3c, 0x0c, 0x0c, 0x0c, 0x0c, 0x3f, 0x3f], // 1
+  [0xff, 0xff, 0x03, 0x03, 0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff], // 2
+  [0xff, 0xff, 0x03, 0x03, 0xff, 0xff, 0x03, 0x03, 0xff, 0xff], // 3
+  [0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xff, 0x03, 0x03, 0x03, 0x03], // 4
+  [0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff, 0x03, 0x03, 0xff, 0xff], // 5
+  [0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff, 0xc3, 0xc3, 0xff, 0xff], // 6
+  [0xff, 0xff, 0x03, 0x03, 0x0c, 0x0c, 0x30, 0x30, 0x30, 0x30], // 7
+  [0xff, 0xff, 0xc3, 0xc3, 0xff, 0xff, 0xc3, 0xc3, 0xff, 0xff], // 8
+  [0xff, 0xff, 0xc3, 0xc3, 0xff, 0xff, 0x03, 0x03, 0xff, 0xff], // 9
+  [0xff, 0xff, 0xc3, 0xc3, 0xff, 0xff, 0xc3, 0xc3, 0xc3, 0xc3], // A
+  [0xfc, 0xfc, 0xc3, 0xc3, 0xfc, 0xfc, 0xc3, 0xc3, 0xfc, 0xfc], // B
+  [0xff, 0xff, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xff, 0xff], // C
+  [0xfc, 0xfc, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfc, 0xfc], // D
+  [0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff], // E
+  [0xff, 0xff, 0xc0, 0xc0, 0xff, 0xff, 0xc0, 0xc0, 0xc0, 0xc0], // F
 ];
 
 const KEY_MAP = new Map<string, number>([
@@ -85,8 +113,9 @@ export interface ProgramMetadata {
 }
 
 export class Chip8Interpreter {
-  metadata: ProgramMetadata | undefined;
-  ctx: CanvasRenderingContext2D | undefined;
+  metadata?: ProgramMetadata;
+  ctx?: CanvasRenderingContext2D;
+  stackTrace: string[];
 
   mem: Uint8Array; // 4096 bytes of memory
   stack: Array<number>; // 12-bit address stack
@@ -110,8 +139,7 @@ export class Chip8Interpreter {
   running: boolean; // start + stop interpreter
 
   constructor() {
-    this.metadata = undefined;
-    this.ctx = undefined;
+    this.stackTrace = [];
 
     this.mem = new Uint8Array(MEM_SIZE).fill(0);
     this.stack = Array<number>();
@@ -126,7 +154,7 @@ export class Chip8Interpreter {
     this.delay = 0;
     this.sound = 0;
     this.soundPlaying = false;
-    this.volume = 5;
+    this.volume = DEFAULT_VOLUME;
     this.oscillator = undefined;
     this.waitingForVBlank = false;
     this.spriteX = 0;
@@ -134,7 +162,7 @@ export class Chip8Interpreter {
     this.spriteN = 0;
     this.running = true;
 
-    this.copyCharData();
+    this.loadFontData();
     this.initDisplay();
   }
 
@@ -168,14 +196,19 @@ export class Chip8Interpreter {
     this.waitingForVBlank = false;
     this.running = true;
 
-    this.copyCharData();
+    this.loadFontData();
     this.clearDisplay();
   }
 
-  copyCharData() {
-    for (let i = 0; i < CHARS.length; i++) {
-      for (let row = 0; row < CHAR_ROWS; row++) {
-        this.mem[i * CHAR_ROWS + row] = CHARS[i][row];
+  loadFontData() {
+    this.copyFontIntoMem(LORES_FONT);
+    this.copyFontIntoMem(HIRES_FONT, HIRES_FONT_ADDR);
+  }
+
+  copyFontIntoMem(font: number[][], startAddr: number = 0) {
+    for (let i = 0; i < font.length; i++) {
+      for (let row = 0; row < font[i].length; row++) {
+        this.mem[i * font[i].length + startAddr + row] = font[i][row];
       }
     }
   }
@@ -232,11 +265,17 @@ export class Chip8Interpreter {
       this.soundPlaying = false;
     }
 
-    if (this.waitingForVBlank || this.skipIfWaitingForKeyPress()) return;
+    if (this.waitingForVBlank || this.waitingForKeyPress()) return;
 
     const hi = this.mem[this.pc++];
     const lo = this.mem[this.pc++];
     const opcode = (hi << BYTE_SHIFT) | lo;
+    this.stackTrace.push(
+      `${(this.pc - 2).toString(16)}: ${opcode.toString(16)}`
+    );
+    if (this.stackTrace.length > 5) {
+      this.stackTrace = this.stackTrace.slice(1);
+    }
 
     const op = (opcode & OP_MASK) >>> OP_SHIFT;
     const nnn = opcode & NNN_MASK;
@@ -248,6 +287,10 @@ export class Chip8Interpreter {
     let temp = 0;
     switch (op) {
       case 0x0:
+        if ((nnn & 0x0f0) === 0x0c0) {
+          this.scrollDisplayDown(n);
+          break;
+        }
         switch (nnn) {
           case 0x0e0:
             this.clearDisplay();
@@ -400,7 +443,10 @@ export class Chip8Interpreter {
             this.i &= NNN_MASK;
             break;
           case 0x29:
-            this.i = this.v[x] * CHAR_ROWS;
+            this.i = this.v[x] * LORES_ROWS;
+            break;
+          case 0x30:
+            this.i = this.v[x] * HIRES_ROWS + HIRES_FONT_ADDR;
             break;
           case 0x33:
             this.bcd(x);
@@ -419,6 +465,16 @@ export class Chip8Interpreter {
             }
             if (!this.metadata!.loadStoreQuirk) {
               this.i += this.metadata!.loadStoreQuirkAlt ? x : x + 1;
+            }
+            break;
+          case 0x75:
+            for (let reg = 0; reg <= x; reg++) {
+              setFlagRegister(reg, this.v[reg]);
+            }
+            break;
+          case 0x85:
+            for (let reg = 0; reg <= x; reg++) {
+              this.v[reg] = getFlagRegister(reg);
             }
             break;
           default:
@@ -447,7 +503,13 @@ export class Chip8Interpreter {
   }
 
   invalidOpcode(opcode: number) {
-    console.log("Invalid opcode:", opcode.toString(16));
+    console.log(
+      "Invalid opcode ",
+      opcode.toString(16),
+      "at pc =",
+      (this.pc - 2).toString(16)
+    );
+    console.log(this.stackTrace);
     this.running = false;
   }
 
@@ -501,18 +563,42 @@ export class Chip8Interpreter {
       if (this.metadata!.wrapQuirk) pxY %= height;
       if (pxY >= height) continue;
       let rowByte = this.mem[this.i + row];
-      for (let col = 0; col < 8; col++) {
+      for (let col = 0; col < BYTE_SIZE; col++) {
         let pxX = xCoord + col;
         if (this.metadata!.wrapQuirk) pxX %= width;
         if (pxX >= width) continue;
-        const px = (rowByte >>> (7 - col)) & 1;
+        const px = (rowByte >>> (BYTE_SIZE - col - 1)) & 1;
         if (px === 1) this.setPixel(pxX, pxY);
       }
     }
   }
 
   drawHiresSprite(x: number, y: number) {
-    // TODO
+    const xCoord = this.v[x] % HIRES_WIDTH;
+    const yCoord = this.v[y] % HIRES_HEIGHT;
+
+    this.v[0xf] = 0;
+    for (let row = 0; row < HIRES_SPRITE_SIZE; row++) {
+      let pxY = yCoord + row;
+      if (this.metadata!.wrapQuirk) pxY %= HIRES_HEIGHT;
+      if (pxY >= HIRES_HEIGHT) continue;
+      let rowByte1 = this.mem[this.i + row * 2];
+      let rowByte2 = this.mem[this.i + row * 2 + 1];
+      for (let col = 0; col < BYTE_SIZE; col++) {
+        let pxX = xCoord + col;
+        if (this.metadata!.wrapQuirk) pxX %= HIRES_WIDTH;
+        if (pxX >= HIRES_WIDTH) continue;
+        const px = (rowByte1 >>> (BYTE_SIZE - col - 1)) & 1;
+        if (px === 1) this.setPixel(pxX, pxY);
+      }
+      for (let col = 0; col < BYTE_SIZE; col++) {
+        let pxX = xCoord + col + BYTE_SIZE;
+        if (this.metadata!.wrapQuirk) pxX %= HIRES_WIDTH;
+        if (pxX >= HIRES_WIDTH) continue;
+        const px = (rowByte2 >>> (BYTE_SIZE - col - 1)) & 1;
+        if (px === 1) this.setPixel(pxX, pxY);
+      }
+    }
   }
 
   setPixel(x: number, y: number) {
@@ -537,15 +623,48 @@ export class Chip8Interpreter {
   }
 
   scrollDisplayRight() {
-    // TODO
+    for (let y = 0; y < HIRES_HEIGHT; y++) {
+      for (let x = HIRES_WIDTH - 5; x >= 0; x--) {
+        const px = this.display[y][x];
+        const scrollPx = this.display[y][x + 4];
+        if (px.on) {
+          px.turnOff(this.filter);
+          scrollPx.turnOn();
+        } else {
+          scrollPx.turnOff(this.filter);
+        }
+      }
+    }
   }
 
   scrollDisplayLeft() {
-    // TODO
+    for (let y = 0; y < HIRES_HEIGHT; y++) {
+      for (let x = 4; x < HIRES_WIDTH; x++) {
+        const px = this.display[y][x];
+        const scrollPx = this.display[y][x - 4];
+        if (px.on) {
+          px.turnOff(this.filter);
+          scrollPx.turnOn();
+        } else {
+          scrollPx.turnOff(this.filter);
+        }
+      }
+    }
   }
 
-  scrollDisplayDown() {
-    // TODO
+  scrollDisplayDown(n: number) {
+    for (let y = HIRES_HEIGHT - (n + 1); y >= 0; y--) {
+      for (let x = 4; x < HIRES_WIDTH; x++) {
+        const px = this.display[y][x];
+        const scrollPx = this.display[y + n][x];
+        if (px.on) {
+          px.turnOff(this.filter);
+          scrollPx.turnOn();
+        } else {
+          scrollPx.turnOff(this.filter);
+        }
+      }
+    }
   }
 
   initDisplay() {
@@ -580,7 +699,7 @@ export class Chip8Interpreter {
     if (key !== undefined) this.keys[key] = false;
   }
 
-  skipIfWaitingForKeyPress(): boolean {
+  waitingForKeyPress(): boolean {
     if (this.keyReg < 0) return false;
 
     const key = this.getFirstPressedKey();
