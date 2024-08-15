@@ -1,4 +1,5 @@
 import {
+  DEFAULT_FILTER,
   DEFAULT_VOLUME,
   getFlagRegister,
   setFlagRegister,
@@ -148,7 +149,7 @@ export class Chip8Interpreter {
     this.i = 0;
     this.display = [];
     this.hires = false;
-    this.filter = Filter.None;
+    this.filter = DEFAULT_FILTER;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -271,7 +272,7 @@ export class Chip8Interpreter {
     const lo = this.mem[this.pc++];
     const opcode = (hi << BYTE_SHIFT) | lo;
     this.stackTrace.push(
-      `${(this.pc - 2).toString(16)}: ${opcode.toString(16)}`
+      `${(this.pc - 2).toString(16)}: ${opcode.toString(16)}`,
     );
     if (this.stackTrace.length > 5) {
       this.stackTrace = this.stackTrace.slice(1);
@@ -507,7 +508,7 @@ export class Chip8Interpreter {
       "Invalid opcode ",
       opcode.toString(16),
       "at pc =",
-      (this.pc - 2).toString(16)
+      (this.pc - 2).toString(16),
     );
     console.log(this.stackTrace);
     this.running = false;
@@ -529,7 +530,7 @@ export class Chip8Interpreter {
           onColor,
           offColor,
           this.filter,
-          this.ctx!
+          this.ctx!,
         );
       }
     }
@@ -547,7 +548,11 @@ export class Chip8Interpreter {
       this.spriteN = n;
       return;
     }
-    n === 0 ? this.drawHiresSprite(x, y) : this.drawLoresSprite(x, y, n);
+    if (n === 0 && this.hires) {
+      this.drawHiresSprite(x, y);
+    } else {
+      this.drawLoresSprite(x, y, n);
+    }
   }
 
   drawLoresSprite(x: number, y: number, n: number) {

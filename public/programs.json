@@ -579,7 +579,7 @@
     "loadStoreQuirkAlt": false
   },
   {
-    "title": "CHIP-8 test suite: Quirks test",
+    "title": "CHIP-8 test suite: Quirks test (Cosmac VIP)",
     "path": "tests/5-quirks.ch8",
     "authors": "Timendus",
     "release": "2023-04-12",
@@ -593,6 +593,23 @@
     "wrapQuirk": false,
     "vBlankQuirk": true,
     "loadStoreQuirk": false,
+    "loadStoreQuirkAlt": false
+  },
+  {
+    "title": "CHIP-8 test suite: Quirks test (SUPER-CHIP)",
+    "path": "tests/5-quirks.ch8",
+    "authors": "Timendus",
+    "release": "2023-04-12",
+    "description": "See https://github.com/Timendus/chip8-test-suite#quirks-test",
+    "platformId": "superchip",
+    "platformName": "Superchip 1.1",
+    "tickrate": 30,
+    "logicQuirk": false,
+    "shiftQuirk": true,
+    "jumpQuirk": true,
+    "wrapQuirk": false,
+    "vBlankQuirk": false,
+    "loadStoreQuirk": true,
     "loadStoreQuirkAlt": false
   },
   {

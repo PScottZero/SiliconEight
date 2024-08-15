@@ -2,6 +2,7 @@ import { HexColorInput, HexColorPicker } from "react-colorful";
 import { Chip8Interpreter } from "@/app/interpreter";
 import { SetStateAction, useEffect, useState } from "react";
 import {
+  DEFAULT_FILTER,
   DEFAULT_OFF,
   DEFAULT_ON,
   DEFAULT_VOLUME,
@@ -13,21 +14,13 @@ import {
   setVolumeStorage,
 } from "@/app/local-storage";
 import Button from "../button/button";
-import { Filter } from "@/app/pixel";
+import { FILTERS, Filter } from "@/app/pixel";
 import styles from "./title-bar.module.css";
-
-const FILTER_ORDER = [
-  Filter.None,
-  Filter.FixFlicker,
-  Filter.Fade,
-  Filter.CRT1,
-  Filter.CRT2,
-];
 
 function setColor(
   on: boolean,
   color: string,
-  setState: (value: SetStateAction<string>) => void
+  setState: (value: SetStateAction<string>) => void,
 ) {
   const cssVar = on ? "--on-color" : "--off-color";
   document.documentElement.style.setProperty(cssVar, color);
@@ -45,7 +38,7 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
   const [showOnPicker, setShowOnPicker] = useState<boolean>(false);
   const [showOffPicker, setShowOffPicker] = useState<boolean>(false);
   const [volume, setVolume] = useState<number>(DEFAULT_VOLUME);
-  const [filter, setFilter] = useState<Filter>(Filter.None);
+  const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER);
 
   const hidePickers = () => {
     setShowOnPicker(false);
@@ -68,9 +61,8 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
   };
 
   const toggleFilter = () => {
-    _setFilter(
-      FILTER_ORDER[(FILTER_ORDER.indexOf(filter) + 1) % FILTER_ORDER.length]
-    );
+    const idx = FILTERS.indexOf(filter)!;
+    _setFilter(FILTERS[(idx + 1) % FILTERS.length]);
   };
 
   const toggleOnPicker = () => {
@@ -111,7 +103,7 @@ export default function TitleBar({ chip8 }: TitleBarProps) {
         </span>
         <div className={styles.separator} />
         <Button
-          text={filter}
+          text={filter.name}
           textColor={onColor}
           backgroundColor={offColor}
           borderColor={onColor}

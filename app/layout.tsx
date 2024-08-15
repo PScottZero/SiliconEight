@@ -5,7 +5,7 @@ import "./globals.css";
 const kodeMono = Kode_Mono({
   weight: "400",
   subsets: ["latin"],
-  display: 'swap',
+  display: "swap",
 });
 
 export const metadata: Metadata = {

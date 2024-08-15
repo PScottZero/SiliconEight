@@ -1,20 +1,80 @@
 const OFF_DELAY = 2;
 const FADE_DELAY = 8;
-export const PX_SCALE = 32;
-const SCANLINE_HEIGHT = 6;
-const SCANLINE_COLOR = "#00000060";
-const SCANLINES_PER_PX = 2;
 
-export enum Filter {
-  None = "No Filter",
-  FixFlicker = "Fix Flicker",
-  Fade = "Fade",
-  CRT1 = "CRT 1",
-  CRT2 = "CRT 2",
+const LCD_BORDER_LINE_WIDTH = 4;
+const CRT_SCANLINE_HEIGHT = 4;
+const CRT_SCANLINES_PER_PX = 2;
+
+const OFF_COLOR_ADJUST = 50;
+const OFF_COLOR_LIGHTEN_THRESHOLD = 128;
+
+export const PX_SCALE = 32;
+
+enum FilterStyle {
+  None,
+  Lcd,
+  Crt,
 }
 
-const FADE_FILTERS = [Filter.Fade, Filter.CRT1, Filter.CRT2];
-const CRT_FILTERS = [Filter.CRT1, Filter.CRT2];
+enum FlickerFix {
+  None,
+  DelayOff,
+  Fade,
+}
+
+export type Filter = {
+  name: string;
+  filterStyle: FilterStyle;
+  flickerFix: FlickerFix;
+};
+
+export const FILTERS: Filter[] = [
+  {
+    name: "No Filter",
+    filterStyle: FilterStyle.None,
+    flickerFix: FlickerFix.None,
+  },
+  {
+    name: "Fix Flicker",
+    filterStyle: FilterStyle.None,
+    flickerFix: FlickerFix.DelayOff,
+  },
+  {
+    name: "Fade",
+    filterStyle: FilterStyle.None,
+    flickerFix: FlickerFix.Fade,
+  },
+  {
+    name: "LCD",
+    filterStyle: FilterStyle.Lcd,
+    flickerFix: FlickerFix.None,
+  },
+  {
+    name: "LCD+FFix",
+    filterStyle: FilterStyle.Lcd,
+    flickerFix: FlickerFix.DelayOff,
+  },
+  {
+    name: "LCD+Fade",
+    filterStyle: FilterStyle.Lcd,
+    flickerFix: FlickerFix.Fade,
+  },
+  {
+    name: "CRT",
+    filterStyle: FilterStyle.Crt,
+    flickerFix: FlickerFix.None,
+  },
+  {
+    name: "CRT+FFix",
+    filterStyle: FilterStyle.Crt,
+    flickerFix: FlickerFix.DelayOff,
+  },
+  {
+    name: "CRT+Fade",
+    filterStyle: FilterStyle.Crt,
+    flickerFix: FlickerFix.Fade,
+  },
+];
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.substring(1, 3), 16);
@@ -39,6 +99,19 @@ function mixColors(c1: string, c2: string, amount: number): string {
   return rgbToHex(rMix, gMix, bMix);
 }
 
+function adjustOffColor(offColor: string) {
+  const [r, g, b] = hexToRgb(offColor);
+  const adjDir = (r + g + b) / 3 < OFF_COLOR_LIGHTEN_THRESHOLD ? 1 : -1;
+  const rAdj = Math.max(0, r + adjDir * OFF_COLOR_ADJUST);
+  const gAdj = Math.max(0, g + adjDir * OFF_COLOR_ADJUST);
+  const bAdj = Math.max(0, b + adjDir * OFF_COLOR_ADJUST);
+  return rgbToHex(rAdj, gAdj, bAdj);
+}
+
+function clip(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export class Pixel {
   on: boolean;
   framesUntilOff: number;
@@ -56,11 +129,13 @@ export class Pixel {
   turnOff(filter: Filter) {
     if (this.on) {
       this.on = false;
-      this.framesUntilOff = FADE_FILTERS.includes(filter)
-        ? FADE_DELAY
-        : filter === Filter.FixFlicker
-          ? OFF_DELAY
-          : 0;
+      if (filter.flickerFix === FlickerFix.Fade) {
+        this.framesUntilOff = FADE_DELAY;
+      } else if (filter.flickerFix === FlickerFix.DelayOff) {
+        this.framesUntilOff = OFF_DELAY;
+      } else {
+        this.framesUntilOff = 0;
+      }
     }
   }
 
@@ -70,11 +145,11 @@ export class Pixel {
     onColor: string,
     offColor: string,
     filter: Filter,
-    ctx: CanvasRenderingContext2D
+    ctx: CanvasRenderingContext2D,
   ) {
-    if (!this.on && FADE_FILTERS.includes(filter)) {
+    if (!this.on && filter.flickerFix === FlickerFix.Fade) {
       let mixAmount = (FADE_DELAY - this.framesUntilOff) / FADE_DELAY;
-      mixAmount = Math.min(Math.max(0, mixAmount), 1);
+      mixAmount = clip(mixAmount, 0, 1);
       ctx.fillStyle = mixColors(onColor, offColor, mixAmount);
     } else {
       ctx.fillStyle = this.on || this.framesUntilOff > 0 ? onColor : offColor;
@@ -83,18 +158,42 @@ export class Pixel {
     x *= PX_SCALE;
     y *= PX_SCALE;
     ctx.fillRect(x, y, PX_SCALE, PX_SCALE);
-    if (CRT_FILTERS.includes(filter)) {
-      ctx.fillStyle = filter === Filter.CRT1 ? SCANLINE_COLOR : offColor;
-      for (let i = 0; i < SCANLINES_PER_PX; i++) {
-        ctx.fillRect(
-          x,
-          y + (PX_SCALE / SCANLINES_PER_PX) * i,
-          PX_SCALE,
-          SCANLINE_HEIGHT
-        );
-      }
+
+    if (filter.filterStyle === FilterStyle.Lcd) {
+      this.lcdFilter(x, y, offColor, ctx);
+    } else if (filter.filterStyle === FilterStyle.Crt) {
+      this.crtFilter(x, y, offColor, ctx);
     }
 
     this.framesUntilOff = Math.max(0, this.framesUntilOff - 1);
+  }
+
+  lcdFilter(
+    x: number,
+    y: number,
+    offColor: string,
+    ctx: CanvasRenderingContext2D,
+  ) {
+    ctx.strokeStyle = adjustOffColor(offColor);
+    ctx.lineWidth = LCD_BORDER_LINE_WIDTH;
+    let pxSize = PX_SCALE;
+    ctx.strokeRect(x, y, pxSize, pxSize);
+  }
+
+  crtFilter(
+    x: number,
+    y: number,
+    offColor: string,
+    ctx: CanvasRenderingContext2D,
+  ) {
+    ctx.fillStyle = adjustOffColor(offColor);
+    for (let i = 0; i < CRT_SCANLINES_PER_PX; i++) {
+      ctx.fillRect(
+        x,
+        y + (PX_SCALE / CRT_SCANLINES_PER_PX) * i,
+        PX_SCALE,
+        CRT_SCANLINE_HEIGHT,
+      );
+    }
   }
 }

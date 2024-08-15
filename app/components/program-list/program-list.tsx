@@ -18,7 +18,7 @@ export default function ProgramList({ runProgram }: ProgramListProps) {
         <li key={metadata.title} onClick={() => runProgram(idx)}>
           {metadata.platformId === "superchip" ? "⚠" : ""}
           {metadata.title}
-        </li>
+        </li>,
       );
     }
   });

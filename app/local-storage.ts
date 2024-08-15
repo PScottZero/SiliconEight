@@ -1,4 +1,4 @@
-import { Filter } from "./pixel";
+import { FILTERS, Filter } from "./pixel";
 
 const ON_KEY = "on";
 const OFF_KEY = "off";
@@ -9,7 +9,7 @@ const FLAG_REG_KEY = "flag";
 export const DEFAULT_ON = "#00ffc0";
 export const DEFAULT_OFF = "#041640";
 export const DEFAULT_VOLUME = 5;
-export const DEFAULT_FILTER = Filter.None;
+export const DEFAULT_FILTER = FILTERS[0];
 export const DEFAULT_FLAG_REG = 0;
 
 export function getColorStorage(on: boolean): string {
@@ -29,16 +29,17 @@ export function setVolumeStorage(volume: number) {
 }
 
 export function getFilterStorage(): Filter {
-  return getLocalStorage(FILTER_KEY, DEFAULT_FILTER) as Filter;
+  const name = getLocalStorage(FILTER_KEY, DEFAULT_FILTER.name);
+  return FILTERS.filter((f) => f.name === name)[0] ?? DEFAULT_FILTER;
 }
 
 export function setFilterStorage(filter: Filter) {
-  setLocalStorage(FILTER_KEY, filter.toString());
+  setLocalStorage(FILTER_KEY, filter.name);
 }
 
 export function getFlagRegister(idx: number): number {
   return parseInt(
-    getLocalStorage(`${FLAG_REG_KEY}-${idx}`, DEFAULT_FLAG_REG.toString())
+    getLocalStorage(`${FLAG_REG_KEY}-${idx}`, DEFAULT_FLAG_REG.toString()),
   );
 }
 
