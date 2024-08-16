@@ -270,7 +270,7 @@ export class Chip8Interpreter {
   }
 
   step() {
-    if (this.sound == 0 && this.soundPlaying) {
+    if (this.sound === 0 && this.soundPlaying) {
       this.oscillator!.stop();
       this.soundPlaying = false;
     }

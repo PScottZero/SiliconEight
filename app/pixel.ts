@@ -35,7 +35,7 @@ export const FILTERS: Filter[] = [
     flickerFix: FlickerFix.None,
   },
   {
-    name: "Fix Flicker",
+    name: "Flicker Fix",
     filterStyle: FilterStyle.None,
     flickerFix: FlickerFix.DelayOff,
   },
@@ -145,7 +145,7 @@ export class Pixel {
     onColor: string,
     offColor: string,
     filter: Filter,
-    ctx: CanvasRenderingContext2D,
+    ctx: CanvasRenderingContext2D
   ) {
     if (!this.on && filter.flickerFix === FlickerFix.Fade) {
       let mixAmount = (FADE_DELAY - this.framesUntilOff) / FADE_DELAY;
@@ -172,7 +172,7 @@ export class Pixel {
     x: number,
     y: number,
     offColor: string,
-    ctx: CanvasRenderingContext2D,
+    ctx: CanvasRenderingContext2D
   ) {
     ctx.strokeStyle = adjustOffColor(offColor);
     ctx.lineWidth = LCD_BORDER_LINE_WIDTH;
@@ -184,7 +184,7 @@ export class Pixel {
     x: number,
     y: number,
     offColor: string,
-    ctx: CanvasRenderingContext2D,
+    ctx: CanvasRenderingContext2D
   ) {
     ctx.fillStyle = adjustOffColor(offColor);
     for (let i = 0; i < CRT_SCANLINES_PER_PX; i++) {
@@ -192,7 +192,7 @@ export class Pixel {
         x,
         y + (PX_SCALE / CRT_SCANLINES_PER_PX) * i,
         PX_SCALE,
-        CRT_SCANLINE_HEIGHT,
+        CRT_SCANLINE_HEIGHT
       );
     }
   }
