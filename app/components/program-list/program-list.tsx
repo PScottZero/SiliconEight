@@ -16,9 +16,8 @@ export default function ProgramList({ runProgram }: ProgramListProps) {
     if (!PLATFORM_EXCLUSIONS.includes(metadata.platformId)) {
       programList.push(
         <li key={metadata.title} onClick={() => runProgram(idx)}>
-          {metadata.platformId === "superchip" ? "⚠" : ""}
           {metadata.title}
-        </li>,
+        </li>
       );
     }
   });

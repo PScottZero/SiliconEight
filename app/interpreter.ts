@@ -96,6 +96,15 @@ const KEY_MAP = new Map<string, number>([
   ["v", 0xf],
 ]);
 
+interface Resolution {
+  width: number;
+  height: number;
+}
+
+const LORES: Resolution = { width: 64, height: 32 };
+const VIP_HIRES: Resolution = { width: 64, height: 64 };
+const HIRES: Resolution = { width: 128, height: 64 };
+
 export interface ProgramMetadata {
   title: string;
   authors: string;
@@ -123,9 +132,9 @@ export class Chip8Interpreter {
   v: Uint8Array; // 16 8-bit registers
   pc: number; // 12-bit program counter
   i: number; // 12-bit memory pointer
-  display: Array<Array<Pixel>>; // 64x32 monochrome display
-  filter: Filter;
-  hires: boolean; // should hires mode be used
+  display: Array<Array<Pixel>>; // monochrome display
+  resolution: Resolution; // 64x32, 64x64, or 128x64
+  filter: Filter; // current display filter
   keys: Array<boolean>; // 16 keypad keys
   keyReg: number; // stores output register while waiting for key press
   delay: number; // 8-bit delay timer
@@ -148,7 +157,7 @@ export class Chip8Interpreter {
     this.pc = START_ADDR;
     this.i = 0;
     this.display = [];
-    this.hires = false;
+    this.resolution = LORES;
     this.filter = DEFAULT_FILTER;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
@@ -187,7 +196,7 @@ export class Chip8Interpreter {
     this.v = new Uint8Array(REG_COUNT).fill(0);
     this.pc = START_ADDR;
     this.i = 0;
-    this.hires = false;
+    this.resolution = LORES;
     this.keys = Array<boolean>(KEY_MAP.size).fill(false);
     this.keyReg = -1;
     this.delay = 0;
@@ -270,12 +279,18 @@ export class Chip8Interpreter {
 
     const hi = this.mem[this.pc++];
     const lo = this.mem[this.pc++];
-    const opcode = (hi << BYTE_SHIFT) | lo;
+    let opcode = (hi << BYTE_SHIFT) | lo;
     this.stackTrace.push(
-      `${(this.pc - 2).toString(16)}: ${opcode.toString(16)}`,
+      `${(this.pc - 2).toString(16)}: ${opcode.toString(16)}`
     );
     if (this.stackTrace.length > 5) {
       this.stackTrace = this.stackTrace.slice(1);
+    }
+
+    // cosmac vip hires mode
+    if (this.pc - 2 === START_ADDR && opcode === 0x1260) {
+      this.resolution = VIP_HIRES;
+      opcode = 0x12c0;
     }
 
     const op = (opcode & OP_MASK) >>> OP_SHIFT;
@@ -309,10 +324,13 @@ export class Chip8Interpreter {
             this.running = false;
             break;
           case 0x0fe:
-            this.hires = false;
+            this.resolution = LORES;
             break;
           case 0x0ff:
-            this.hires = true;
+            this.resolution = HIRES;
+            break;
+          case 0x230:
+            this.clearDisplay();
             break;
           default:
             this.invalidOpcode(opcode);
@@ -508,7 +526,7 @@ export class Chip8Interpreter {
       "Invalid opcode ",
       opcode.toString(16),
       "at pc =",
-      (this.pc - 2).toString(16),
+      (this.pc - 2).toString(16)
     );
     console.log(this.stackTrace);
     this.running = false;
@@ -530,7 +548,7 @@ export class Chip8Interpreter {
           onColor,
           offColor,
           this.filter,
-          this.ctx!,
+          this.ctx!
         );
       }
     }
@@ -548,7 +566,7 @@ export class Chip8Interpreter {
       this.spriteN = n;
       return;
     }
-    if (n === 0 && this.hires) {
+    if (n === 0 && this.resolution === HIRES) {
       this.drawHiresSprite(x, y);
     } else {
       this.drawLoresSprite(x, y, n);
@@ -556,22 +574,19 @@ export class Chip8Interpreter {
   }
 
   drawLoresSprite(x: number, y: number, n: number) {
-    const width = this.hires ? HIRES_WIDTH : LORES_WIDTH;
-    const height = this.hires ? HIRES_HEIGHT : LORES_HEIGHT;
-
-    const xCoord = this.v[x] % width;
-    const yCoord = this.v[y] % height;
+    const xCoord = this.v[x] % this.resolution.width;
+    const yCoord = this.v[y] % this.resolution.height;
 
     this.v[0xf] = 0;
     for (let row = 0; row < n; row++) {
       let pxY = yCoord + row;
-      if (this.metadata!.wrapQuirk) pxY %= height;
-      if (pxY >= height) continue;
+      if (this.metadata!.wrapQuirk) pxY %= this.resolution.height;
+      if (pxY >= this.resolution.height) continue;
       let rowByte = this.mem[this.i + row];
       for (let col = 0; col < BYTE_SIZE; col++) {
         let pxX = xCoord + col;
-        if (this.metadata!.wrapQuirk) pxX %= width;
-        if (pxX >= width) continue;
+        if (this.metadata!.wrapQuirk) pxX %= this.resolution.width;
+        if (pxX >= this.resolution.width) continue;
         const px = (rowByte >>> (BYTE_SIZE - col - 1)) & 1;
         if (px === 1) this.setPixel(pxX, pxY);
       }
@@ -607,15 +622,22 @@ export class Chip8Interpreter {
   }
 
   setPixel(x: number, y: number) {
-    [x, y] = this.hires ? [x, y] : [x * 2, y * 2];
-    const coords = this.hires
-      ? [[x, y]]
-      : [
-          [x, y],
-          [x + 1, y],
-          [x, y + 1],
-          [x + 1, y + 1],
-        ];
+    let coords = [];
+    if (this.resolution === HIRES) {
+      coords = [[x, y]];
+    } else if (this.resolution === VIP_HIRES) {
+      coords = [[x + 32, y]];
+    } else {
+      x *= 2;
+      y *= 2;
+      coords = [
+        [x, y],
+        [x + 1, y],
+        [x, y + 1],
+        [x + 1, y + 1],
+      ];
+    }
+
     for (const coord of coords) {
       const px = this.display[coord[1]][coord[0]];
       if (px.on) {
